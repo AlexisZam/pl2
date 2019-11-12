@@ -23,8 +23,8 @@ void push(struct stack *s, long x) {
 long pop(struct stack *s) {
     if (s == NULL)
         return 0;
-    struct stack *t = s;
     long x = s->x;
+    struct stack *t = s;
     s = s->next;
     free(t);
     return x;
@@ -48,10 +48,10 @@ int main(int argc, char *argv[]) {
             if (c == '\n')
                 break;
             if (c == EOF)
-                goto end;
+                goto eof;
             program[i][j] = c;
         }
-end:
+eof:
     fclose(fp);
 
     char cmd;
@@ -144,19 +144,37 @@ end:
             acc = pop(s);
             break;
         case '"':
+            for (;;) {
+                i = (i + 1) % N;
+                if (program[i][j] == '"')
+                    break;
+                push(s, acc);
+                acc = (char)program[i][j];
+            }
             break;
         case ':':
             push(s, acc);
             i = (i + 1) % N;
             break;
         case '\\':
+            long tmp = acc;
+            acc = pop(s);
+            push(s, tmp);
+            // todo: unnecessary malloc/free
             break;
         case '$':
             pop(s);
+            i = (i + 1) % N;
             break;
         case '.':
+            printf("%c", (char)acc);
+            acc = pop(s);
+            i = (i + 1) % N;
             break;
         case ',':
+            printf("%d ", (int)acc);
+            acc = pop(s);
+            i = (i + 1) % N;
             break;
         case '#':
             i = (i + 2) % N;
@@ -166,11 +184,17 @@ end:
             i = (i + 1) % N;
             break;
         case 'p':
-            long i = pop(s);
-            program[i][acc] = pop(s);
+            long x = pop(s);
+            program[x][acc] = pop(s);
             acc = pop(s);
+            i = (i + 1) % N;
             break;
         case '&':
+            long x;
+            scanf("%d", &x);
+            push(s, acc);
+            acc = x;
+            i = (i + 1) % N;
             break;
         case '~':
             push(s, getchar());
