@@ -1,0 +1,12 @@
+CC = gcc
+CFLAGS = -O3 -Wall
+
+.PHONY:	all clean
+
+all: befunge93
+
+befunge93:
+	$(CC) $(CFLAGS) -o befunge93 befunge93.c
+
+clean:
+	$(RM) befunge93
