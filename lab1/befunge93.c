@@ -2,17 +2,13 @@
 #include <stdlib.h>
 #include <time.h>
 
-#define M 80
-#define N 25
+#define M 25
+#define N 80
 
 struct stack {
     long x;
     struct stack *next;
 };
-
-void init(struct stack *s) {
-    s = NULL;
-}
 
 void push(struct stack *s, long x) {
     struct stack *t = malloc(sizeof(struct stack));
@@ -31,19 +27,20 @@ long pop(struct stack *s) {
 }
 
 int main(int argc, char *argv[]) {
-    if (argc != 1) {
+    if (argc != 2) {
         fprintf(stderr, "Usage: ./befunge93 program");
         return -1;
     }
 
     char program[M][N];
-    for (int i = 1; i < M; i++)
-        for (int j = 1; j < N; j++)
+    for (int i = 0; i < M; i++)
+        for (int j = 0; j < N; j++)
             program[i][j] = ' ';
 
+    // todo: input too large
     FILE *fp = fopen(argv[1], "r");
-    for (int i = 1; i < M; i++)
-        for (int j = 1; j < N; j++) {
+    for (int i = 0; i < M; i++)
+        for (int j = 0; j < N; j++) {
             int c = fgetc(fp);
             if (c == '\n')
                 break;
@@ -57,82 +54,83 @@ eof:
     char cmd;
     int i = 0, j = 0;
 
-    struct stack *s;
-    long acc;
-    init(s);
+    struct stack *s = NULL;
+    long acc = -1;
 
     srand(time(NULL));
+
+    long tmp;
 
     for (;;) {
         cmd = program[i][j];
         switch (cmd) {
-        case 0:
-        case 1:
-        case 2:
-        case 3:
-        case 4:
-        case 5:
-        case 6:
-        case 7:
-        case 8:
-        case 9:
+        case '0':
+        case '1':
+        case '2':
+        case '3':
+        case '4':
+        case '5':
+        case '6':
+        case '7':
+        case '8':
+        case '9':
             push(s, acc);
-            acc = cmd;
-            i = (i + 1) % N;
+            acc = (int)cmd;
+            j = (j + 1) % N;
             break;
         case '+':
             acc = pop(s) + acc;
-            i = (i + 1) % N;
+            j = (j + 1) % N;
             break;
         case '-':
             acc = pop(s) - acc;
-            i = (i + 1) % N;
+            j = (j + 1) % N;
             break;
         case '*':
             acc = pop(s) * acc;
-            i = (i + 1) % N;
+            j = (j + 1) % N;
             break;
         case '/':
             acc = pop(s) / acc;
-            i = (i + 1) % N;
+            j = (j + 1) % N;
             break;
         case '%':
             acc = pop(s) % acc;
-            i = (i + 1) % N;
+            j = (j + 1) % N;
             break;
         case '!':
             acc = !acc;
-            i = (i + 1) % N;
+            j = (j + 1) % N;
             break;
         case '`':
             acc = pop(s) > acc;
-            i = (i + 1) % N;
+            j = (j + 1) % N;
             break;
         case '>':
-            i = (i + 1) % N;
+            j = (j + 1) % N;
             break;
         case '<':
-            i = (i - 1) % N;
+            j = (j - 1) % N;
             break;
         case '^':
-            i = (j + 1) % M;
+            i = (i + 1) % M;
             break;
         case 'v':
-            i = (j - 1) % M;
+            i = (i - 1) % M;
             break;
         case '?':
             switch (rand() % 4) {
             case 0:
-                i = (i + 1) % N;
+                j = (j + 1) % N;
                 break;
             case 1:
-                i = (i - 1) % N;
+                j = (j - 1) % N;
                 break;
             case 2:
-                i = (j + 1) % M;
+                i = (i + 1) % M;
                 break;
             case 3:
-                i = (j - 1) % M;
+                i = (i - 1) % M;
             }
             break;
         case '_':
@@ -145,60 +143,62 @@ eof:
             break;
         case '"':
             for (;;) {
-                i = (i + 1) % N;
+                j = (j + 1) % N;
                 if (program[i][j] == '"')
                     break;
                 push(s, acc);
                 acc = (char)program[i][j];
             }
+            j = (j + 1) % N;
             break;
         case ':':
             push(s, acc);
-            i = (i + 1) % N;
+            j = (j + 1) % N;
             break;
         case '\\':
-            long tmp = acc;
-            acc = pop(s);
-            push(s, tmp);
-            // todo: unnecessary malloc/free
+            tmp = acc;
+            acc = s->x;
+            s->x = tmp;
             break;
         case '$':
             pop(s);
-            i = (i + 1) % N;
+            j = (j + 1) % N;
             break;
         case '.':
             printf("%c", (char)acc);
             acc = pop(s);
-            i = (i + 1) % N;
+            j = (j + 1) % N;
             break;
         case ',':
             printf("%d ", (int)acc);
             acc = pop(s);
-            i = (i + 1) % N;
+            j = (j + 1) % N;
             break;
         case '#':
             i = (i + 2) % N;
             break;
         case 'g':
             acc = program[pop(s)][acc];
-            i = (i + 1) % N;
+            j = (j + 1) % N;
             break;
         case 'p':
-            long x = pop(s);
-            program[x][acc] = pop(s);
+            tmp = pop(s);
+            program[tmp][acc] = pop(s);
             acc = pop(s);
-            i = (i + 1) % N;
+            j = (j + 1) % N;
             break;
         case '&':
-            long x;
-            scanf("%d", &x);
+            if (scanf("%ld", &tmp) != 1) {
+                fprintf(stderr, "Read failed");
+                return -1;
+            }
             push(s, acc);
-            acc = x;
-            i = (i + 1) % N;
+            acc = tmp;
+            j = (j + 1) % N;
             break;
         case '~':
             push(s, getchar());
-            i = (i + 1) % N;
+            j = (j + 1) % N;
             break;
         case '@':
             return 0;
