@@ -5,7 +5,7 @@ CFLAGS = -O3 -Wall
 
 all: befunge93
 
-befunge93:
+befunge93: befunge93.c
 	$(CC) $(CFLAGS) -o befunge93 befunge93.c
 
 clean:

@@ -2,62 +2,97 @@
 #include <stdlib.h>
 #include <time.h>
 
-#define M 25
-#define N 80
+/* Program */
 
-int direction = 0;
+#define HEIGHT 25
+#define WIDTH 80
+char program[HEIGHT][WIDTH];
+
+void initProgram() {
+    for (int i = 0; i < HEIGHT; i++)
+        for (int j = 0; j < WIDTH; j++)
+            program[i][j] = ' ';
+}
+
+void readProgram(char *filename) {
+    // todo: input too large
+    FILE *fp = fopen(filename, "r");
+    for (int i = 0; i < HEIGHT; i++)
+        for (int j = 0; j < WIDTH; j++) {
+            int c = fgetc(fp);
+            if (c == '\n')
+                break;
+            if (c == EOF) {
+                fclose(fp);
+                return;
+            }
+            program[i][j] = c;
+        }
+    fclose(fp);
+}
+
+void printProgram() {
+    for (int i = 0; i < HEIGHT; i++) {
+        for (int j = 0; j < WIDTH; j++)
+            fprintf(stderr, "%c", program[i][j]);
+        fprintf(stderr, "\n");
+    }
+}
+
 int i = 0, j = 0;
+int direction = 0;
 
 void next() {
     switch (direction) {
     case 0:
-        j = (j + 1) % N;
+        j = (j + 1) % WIDTH;
         break;
     case 1:
-        j = (j - 1) % N;
+        j = (j - 1 + WIDTH) % WIDTH;
         break;
     case 2:
-        i = (i + 1) % M;
+        i = (i + 1) % HEIGHT;
         break;
     case 3:
-        i = (i - 1) % M;
+        i = (i - 1 + HEIGHT) % HEIGHT;
     }
 }
 
-struct entry {
-    long x;
-    struct entry *next;
-};
+/* Stack */
 
 struct stack {
-    struct entry *head;
-};
+    long x;
+    struct stack *next;
+} * head;
 
-void push(struct stack *s, long a) {
-    struct entry *e = malloc(sizeof(struct entry));
-    e->x = a;
-    e->next = s->head;
-    s->head = e;
+void initStack() {
+    head = NULL;
 }
 
-long peek(struct stack *s) {
-    if (!s->head)
-        return 0;
-    return s->head->x;
+void push(long x) {
+    struct stack *s = malloc(sizeof(struct stack));
+    s->x = x;
+    s->next = head;
+    head = s;
 }
 
-long pop(struct stack *s) {
-    if (!s->head)
+long pop() {
+    if (!head)
         return 0;
-    struct entry *e = s->head;
-    long x = s->head->x;
-    s->head = e->next;
-    free(e);
+    struct stack *s = head;
+    long x = head->x;
+    head = s->next;
+    free(s);
     return x;
 }
 
-void print(struct stack s) {
+void printStack() {
+    for (struct stack *t = head; t; t = t->next)
+        fprintf(stderr, "%ld ", t->x);
+    fprintf(stderr, "\n");
 }
+
+/* VM */
 
 int main(int argc, char *argv[]) {
     if (argc != 2) {
@@ -65,39 +100,14 @@ int main(int argc, char *argv[]) {
         return -1;
     }
 
-    char program[M][N];
-    for (int i = 0; i < M; i++)
-        for (int j = 0; j < N; j++)
-            program[i][j] = ' ';
-
-    // todo: input too large
-    FILE *fp = fopen(argv[1], "r");
-    for (int i = 0; i < M; i++)
-        for (int j = 0; j < N; j++) {
-            int c = fgetc(fp);
-            if (c == '\n')
-                break;
-            if (c == EOF)
-                goto eof;
-            program[i][j] = c;
-        }
-eof:
-    fclose(fp);
-
-    char cmd;
-    long tmp1, tmp2;
-    struct stack *s = malloc(sizeof(struct stack));
-    s->head = NULL;
-
+    initProgram();
+    readProgram(argv[1]);
+    initStack();
     srand(time(NULL));
 
     for (;;) {
-        cmd = program[i][j];
-        printf("%c: ", cmd);
-        for (struct entry *t = s->head; t; t = t->next)
-            printf("%ld ", t->x);
-        printf("\n");
-        switch (cmd) {
+        char command = program[i][j];
+        switch (command) {
         case '0':
         case '1':
         case '2':
@@ -108,138 +118,130 @@ eof:
         case '7':
         case '8':
         case '9':
-            push(s, cmd - '0');
-            next();
+            push(command - '0');
             break;
         case '+':
-            tmp1 = pop(s);
-            push(s, pop(s) + tmp1);
-            next();
+            push(pop() + pop());
             break;
-        case '-':
-            tmp1 = pop(s);
-            push(s, pop(s) - tmp1);
-            next();
+        case '-': {
+            long temp = pop();
+            push(pop() - temp);
             break;
+        }
         case '*':
-            tmp1 = pop(s);
-            push(s, pop(s) * tmp1);
-            next();
+            push(pop() * pop());
             break;
-        case '/':
-            tmp1 = pop(s);
-            push(s, pop(s) / tmp1);
-            next();
+        case '/': {
+            // todo: division by 0
+            long temp = pop();
+            push(pop() / temp);
             break;
-        case '%':
-            tmp1 = pop(s);
-            push(s, pop(s) % tmp1);
-            next();
+        }
+        case '%': {
+            // todo: division by 0
+            long temp = pop();
+            push(pop() % temp);
             break;
+        }
         case '!':
-            push(s, pop(s));
-            next();
+            push(!pop());
             break;
-        case '`':
-            tmp1 = pop(s);
-            push(s, pop(s) > tmp1);
-            next();
+        case '`': {
+            long temp = pop();
+            push(pop() > temp);
             break;
+        }
         case '>':
             direction = 0;
-            next();
             break;
         case '<':
             direction = 1;
-            next();
             break;
         case 'v':
             direction = 2;
-            next();
             break;
         case '^':
             direction = 3;
-            next();
             break;
         case '?':
             direction = rand() % 4;
-            next();
             break;
         case '_':
-            direction = pop(s) ? 1 : 0;
-            next();
+            direction = pop() ? 1 : 0;
             break;
         case '|':
-            direction = pop(s) ? 3 : 2;
-            next();
+            direction = pop() ? 3 : 2;
             break;
         case '"':
             for (;;) {
                 next();
                 if (program[i][j] == '"')
                     break;
-                push(s, program[i][j]);
+                push(program[i][j]);
             }
-            next();
             break;
-        case ':':
-            push(s, peek(s));
-            next();
+        case ':': {
+            long temp = pop(head);
+            push(temp);
+            push(temp);
             break;
-        case '\\':
-            tmp1 = pop(s);
-            tmp2 = pop(s);
-            push(s, tmp2);
-            push(s, tmp1);
-            next();
+        }
+        case '\\': {
+            long temp1 = pop();
+            long temp2 = pop();
+            push(temp1);
+            push(temp2);
             break;
+        }
         case '$':
-            pop(s);
-            next();
+            pop();
             break;
         case '.':
-            printf("%d ", (int)pop(s));
-            next();
+            printf("%ld ", pop());
             break;
         case ',':
-            printf("%c", (char)pop(s));
-            next();
+            printf("%c", (char)pop());
             break;
         case '#':
             next();
-            next();
             break;
-        case 'g':
-            tmp1 = pop(s);
-            push(s, program[pop(s)][tmp1]);
-            next();
+        case 'g': {
+            long i = pop();
+            long j = pop();
+            push(program[i][j]);
             break;
-        case 'p':
-            tmp1 = pop(s);
-            tmp2 = pop(s);
-            program[tmp2][tmp1] = pop(s);
-            next();
+        }
+        case 'p': {
+            long i = pop();
+            long j = pop();
+            long command = pop();
+            if (command <= 10)
+                command += '0';
+            program[i][j] = command;
             break;
-        case '&':
-            if (scanf("%ld", &tmp1) != 1) {
+        }
+        case '&': {
+            long temp;
+            if (scanf("%ld", &temp) != 1) {
                 fprintf(stderr, "Read failed\n");
                 return -1;
             }
-            push(s, tmp1);
-            next();
+            push(temp);
             break;
+        }
         case '~':
-            push(s, getchar());
-            next();
+            push(getchar());
             break;
         case '@':
-            // printf("\n");
             return 0;
         case ' ':
             break;
         default:
-            fprintf(stderr, "Command %c not found\n", cmd);
+            fprintf(stderr, "Command %c not found\n", command);
             return -1;
         }
+        next();
+        // fprintf(stderr, "%c: ", command);
+        // printStack(head);
     }
 }
