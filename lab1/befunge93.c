@@ -2,6 +2,40 @@
 #include <stdlib.h>
 #include <time.h>
 
+/* Stack */
+
+struct stack {
+    long x;
+    struct stack *next;
+} * head;
+
+void initStack() {
+    head = NULL;
+}
+
+void push(long x) {
+    struct stack *s = malloc(sizeof(struct stack));
+    s->x = x;
+    s->next = head;
+    head = s;
+}
+
+long pop() {
+    if (!head)
+        return 0;
+    struct stack *s = head;
+    long x = head->x;
+    head = s->next;
+    free(s);
+    return x;
+}
+
+void printStack() {
+    for (struct stack *t = head; t; t = t->next)
+        dprintf(3, "%ld ", t->x);
+    dprintf(3, "\n");
+}
+
 /* Program */
 
 #define HEIGHT 25
@@ -58,53 +92,9 @@ void next() {
     }
 }
 
-/* Stack */
-
-struct stack {
-    long x;
-    struct stack *next;
-} * head;
-
-void initStack() {
-    head = NULL;
-}
-
-void push(long x) {
-    struct stack *s = malloc(sizeof(struct stack));
-    s->x = x;
-    s->next = head;
-    head = s;
-}
-
-long pop() {
-    if (!head)
-        return 0;
-    struct stack *s = head;
-    long x = head->x;
-    head = s->next;
-    free(s);
-    return x;
-}
-
-void printStack() {
-    for (struct stack *t = head; t; t = t->next)
-        fprintf(stderr, "%ld ", t->x);
-    fprintf(stderr, "\n");
-}
-
 /* VM */
 
-int main(int argc, char *argv[]) {
-    if (argc != 2) {
-        fprintf(stderr, "Usage: ./befunge93 program\n");
-        return -1;
-    }
-
-    initProgram();
-    readProgram(argv[1]);
-    initStack();
-    srand(time(NULL));
-
+void run() {
     for (;;) {
         char command = program[i][j];
         switch (command) {
@@ -132,13 +122,13 @@ int main(int argc, char *argv[]) {
             push(pop() * pop());
             break;
         case '/': {
-            // todo: division by 0
+            // TODO: division by 0
             long temp = pop();
             push(pop() / temp);
             break;
         }
         case '%': {
-            // todo: division by 0
+            // TODO: division by 0
             long temp = pop();
             push(pop() % temp);
             break;
@@ -173,11 +163,15 @@ int main(int argc, char *argv[]) {
             direction = pop() ? 3 : 2;
             break;
         case '"':
+            // fprintf(stderr, "%c: ", command);
+            printStack(head);
             for (;;) {
                 next();
                 if (program[i][j] == '"')
                     break;
                 push(program[i][j]);
+                // fprintf(stderr, "%c: ", command);
+                printStack(head);
             }
             break;
         case ':': {
@@ -208,23 +202,28 @@ int main(int argc, char *argv[]) {
         case 'g': {
             long i = pop();
             long j = pop();
-            push(program[i][j]);
+            if (i < 0 || i >= HEIGHT || j < 0 || j >= WIDTH) {
+                fprintf(stderr, "g 'Get' instruction out of bounds (%ld,%ld)\n", j, i);
+                push(0);
+            } else
+                push(program[i][j]);
             break;
         }
         case 'p': {
             long i = pop();
             long j = pop();
-            long command = pop();
-            if (command <= 10)
-                command += '0';
-            program[i][j] = command;
+            if (i < 0 || i >= HEIGHT || j < 0 || j >= WIDTH) {
+                fprintf(stderr, "p 'Put' instruction out of bounds (%ld,%ld)\n", j, i);
+                pop();
+            } else
+                program[i][j] = pop();
             break;
         }
         case '&': {
             long temp;
             if (scanf("%ld", &temp) != 1) {
-                fprintf(stderr, "Read failed\n");
-                return -1;
+                fprintf(stderr, "Read failed");
+                exit(-1);
             }
             push(temp);
             break;
@@ -233,15 +232,32 @@ int main(int argc, char *argv[]) {
             push(getchar());
             break;
         case '@':
-            return 0;
+            exit(0);
         case ' ':
             break;
         default:
-            fprintf(stderr, "Command %c not found\n", command);
-            return -1;
+            fprintf(stderr, "Unsupported instruction '%c' (0x%x) (maybe not Befunge-93?)\n", command, command);
         }
         next();
         // fprintf(stderr, "%c: ", command);
-        // printStack(head);
+        printStack(head);
     }
+}
+
+/* Main program */
+
+int main(int argc, char *argv[]) {
+    if (argc != 2) {
+        fprintf(stderr, "Usage: ./befunge93 foo.bf\n");
+        return -1;
+    }
+
+    initProgram();
+    readProgram(argv[1]);
+
+    initStack();
+
+    srand(time(NULL));
+
+    run();
 }
