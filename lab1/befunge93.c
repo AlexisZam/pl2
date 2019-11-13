@@ -5,30 +5,63 @@
 #define M 25
 #define N 80
 
-struct stack {
+int direction = 0;
+int i = 0, j = 0;
+
+void next() {
+    switch (direction) {
+    case 0:
+        j = (j + 1) % N;
+        break;
+    case 1:
+        j = (j - 1) % N;
+        break;
+    case 2:
+        i = (i + 1) % M;
+        break;
+    case 3:
+        i = (i - 1) % M;
+    }
+}
+
+struct entry {
     long x;
-    struct stack *next;
+    struct entry *next;
 };
 
-void push(struct stack *s, long x) {
-    struct stack *t = malloc(sizeof(struct stack));
-    t->x = x;
-    t->next = s;
+struct stack {
+    struct entry *head;
+};
+
+void push(struct stack *s, long a) {
+    struct entry *e = malloc(sizeof(struct entry));
+    e->x = a;
+    e->next = s->head;
+    s->head = e;
+}
+
+long peek(struct stack *s) {
+    if (!s->head)
+        return 0;
+    return s->head->x;
 }
 
 long pop(struct stack *s) {
-    if (s == NULL)
+    if (!s->head)
         return 0;
-    long x = s->x;
-    struct stack *t = s;
-    s = s->next;
-    free(t);
+    struct entry *e = s->head;
+    long x = s->head->x;
+    s->head = e->next;
+    free(e);
     return x;
+}
+
+void print(struct stack s) {
 }
 
 int main(int argc, char *argv[]) {
     if (argc != 2) {
-        fprintf(stderr, "Usage: ./befunge93 program");
+        fprintf(stderr, "Usage: ./befunge93 program\n");
         return -1;
     }
 
@@ -52,17 +85,18 @@ eof:
     fclose(fp);
 
     char cmd;
-    int i = 0, j = 0;
-
-    struct stack *s = NULL;
-    long acc = -1;
+    long tmp1, tmp2;
+    struct stack *s = malloc(sizeof(struct stack));
+    s->head = NULL;
 
     srand(time(NULL));
 
-    long tmp;
-
     for (;;) {
         cmd = program[i][j];
+        printf("%c: ", cmd);
+        for (struct entry *t = s->head; t; t = t->next)
+            printf("%ld ", t->x);
+        printf("\n");
         switch (cmd) {
         case '0':
         case '1':
@@ -74,138 +108,137 @@ eof:
         case '7':
         case '8':
         case '9':
-            push(s, acc);
-            acc = (int)cmd;
-            j = (j + 1) % N;
+            push(s, cmd - '0');
+            next();
             break;
         case '+':
-            acc = pop(s) + acc;
-            j = (j + 1) % N;
+            tmp1 = pop(s);
+            push(s, pop(s) + tmp1);
+            next();
             break;
         case '-':
-            acc = pop(s) - acc;
-            j = (j + 1) % N;
+            tmp1 = pop(s);
+            push(s, pop(s) - tmp1);
+            next();
             break;
         case '*':
-            acc = pop(s) * acc;
-            j = (j + 1) % N;
+            tmp1 = pop(s);
+            push(s, pop(s) * tmp1);
+            next();
             break;
         case '/':
-            acc = pop(s) / acc;
-            j = (j + 1) % N;
+            tmp1 = pop(s);
+            push(s, pop(s) / tmp1);
+            next();
             break;
         case '%':
-            acc = pop(s) % acc;
-            j = (j + 1) % N;
+            tmp1 = pop(s);
+            push(s, pop(s) % tmp1);
+            next();
             break;
         case '!':
-            acc = !acc;
-            j = (j + 1) % N;
+            push(s, pop(s));
+            next();
             break;
         case '`':
-            acc = pop(s) > acc;
-            j = (j + 1) % N;
+            tmp1 = pop(s);
+            push(s, pop(s) > tmp1);
+            next();
             break;
         case '>':
-            j = (j + 1) % N;
+            direction = 0;
+            next();
             break;
         case '<':
-            j = (j - 1) % N;
-            break;
-        case '^':
-            i = (i + 1) % M;
+            direction = 1;
+            next();
             break;
         case 'v':
-            i = (i - 1) % M;
+            direction = 2;
+            next();
+            break;
+        case '^':
+            direction = 3;
+            next();
             break;
         case '?':
-            switch (rand() % 4) {
-            case 0:
-                j = (j + 1) % N;
-                break;
-            case 1:
-                j = (j - 1) % N;
-                break;
-            case 2:
-                i = (i + 1) % M;
-                break;
-            case 3:
-                i = (i - 1) % M;
-            }
+            direction = rand() % 4;
+            next();
             break;
         case '_':
-            i = acc ? (i - 1) % N : (i + 1) % N;
-            acc = pop(s);
+            direction = pop(s) ? 1 : 0;
+            next();
             break;
         case '|':
-            j = acc ? (j - 1) % M : (j + 1) % M;
-            acc = pop(s);
+            direction = pop(s) ? 3 : 2;
+            next();
             break;
         case '"':
             for (;;) {
-                j = (j + 1) % N;
+                next();
                 if (program[i][j] == '"')
                     break;
-                push(s, acc);
-                acc = (char)program[i][j];
+                push(s, program[i][j]);
             }
-            j = (j + 1) % N;
+            next();
             break;
         case ':':
-            push(s, acc);
-            j = (j + 1) % N;
+            push(s, peek(s));
+            next();
             break;
         case '\\':
-            tmp = acc;
-            acc = s->x;
-            s->x = tmp;
+            tmp1 = pop(s);
+            tmp2 = pop(s);
+            push(s, tmp2);
+            push(s, tmp1);
+            next();
             break;
         case '$':
             pop(s);
-            j = (j + 1) % N;
+            next();
             break;
         case '.':
-            printf("%c", (char)acc);
-            acc = pop(s);
-            j = (j + 1) % N;
+            printf("%d ", (int)pop(s));
+            next();
             break;
         case ',':
-            printf("%d ", (int)acc);
-            acc = pop(s);
-            j = (j + 1) % N;
+            printf("%c", (char)pop(s));
+            next();
             break;
         case '#':
-            i = (i + 2) % N;
+            next();
+            next();
             break;
         case 'g':
-            acc = program[pop(s)][acc];
-            j = (j + 1) % N;
+            tmp1 = pop(s);
+            push(s, program[pop(s)][tmp1]);
+            next();
             break;
         case 'p':
-            tmp = pop(s);
-            program[tmp][acc] = pop(s);
-            acc = pop(s);
-            j = (j + 1) % N;
+            tmp1 = pop(s);
+            tmp2 = pop(s);
+            program[tmp2][tmp1] = pop(s);
+            next();
             break;
         case '&':
-            if (scanf("%ld", &tmp) != 1) {
-                fprintf(stderr, "Read failed");
+            if (scanf("%ld", &tmp1) != 1) {
+                fprintf(stderr, "Read failed\n");
                 return -1;
             }
-            push(s, acc);
-            acc = tmp;
-            j = (j + 1) % N;
+            push(s, tmp1);
+            next();
             break;
         case '~':
             push(s, getchar());
-            j = (j + 1) % N;
+            next();
             break;
         case '@':
+            // printf("\n");
             return 0;
         case ' ':
             break;
         default:
-            fprintf(stderr, "Command %c not found", cmd);
+            fprintf(stderr, "Command %c not found\n", cmd);
             return -1;
         }
     }
