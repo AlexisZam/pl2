@@ -1,17 +1,18 @@
 #!/bin/bash
 
-BEF=~/opt/Befunge-93/bin/bef
+BEF_DIR=~/opt/Befunge-93
 
 make
-for test in $(ls test/*bf)
+for test in $(ls $BEF_DIR/eg/*.bf test/*.bf)
 do
-    echo $test | cut -d / -f 2 | cut -d . -f 1
-    ./befunge93 $test > befunge93.out 2> befunge93.err 3> befunge93.stack
-    $BEF -s bef.stack $test > bef.out 2> bef.err
+    echo $test
+    $BEF_DIR/bin/bef -s bef.stack $test  2> bef.err > bef.out
+    ./befunge93 $test 2> befunge93.err 3> befunge93.stack > befunge93.out
     sed -i 1d bef.out
-    diff befunge93.out bef.out
-    diff befunge93.err bef.err
-    diff befunge93.stack bef.stack
+    diff bef.out befunge93.out
+    diff bef.err befunge93.err
+    diff bef.stack befunge93.stack
+    sleep 5
 done
 rm -f *out *err *stack
 make clean

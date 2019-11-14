@@ -2,15 +2,16 @@
 #include <stdlib.h>
 #include <time.h>
 
+// dprintf(STACK_FD, "%c: ", program[j * WIDTH + i]);
 #define NEXT()        \
     next();           \
     printStack(head); \
-    goto *program_as_labels[i][j];
+    goto **pc;
 
 /* Function prototypes */
 
 void initProgram();
-void readProgram(char *filename);
+void readProgram(char *);
 void initStack();
 void run();
 
@@ -22,13 +23,9 @@ int main(int argc, char *argv[]) {
         return -1;
     }
 
-    initProgram();
     readProgram(argv[1]);
 
-    initStack();
-
     srand(time(NULL));
-
     run();
 }
 
@@ -37,11 +34,7 @@ int main(int argc, char *argv[]) {
 struct stack {
     long x;
     struct stack *next;
-} * head;
-
-void initStack() {
-    head = NULL;
-}
+} *head = NULL;
 
 void push(long x) {
     struct stack *s = malloc(sizeof(struct stack));
@@ -62,80 +55,84 @@ long pop() {
 
 #define STACK_FD 3
 void printStack() {
+#ifdef STACK
     for (struct stack *t = head; t; t = t->next)
         dprintf(STACK_FD, "%ld ", t->x);
     dprintf(STACK_FD, "\n");
+#endif
 }
 
 /* Program */
 
 #define HEIGHT 25
 #define WIDTH 80
-char program[HEIGHT][WIDTH];
-
-void initProgram() {
-    for (int i = 0; i < HEIGHT; i++)
-        for (int j = 0; j < WIDTH; j++)
-            program[i][j] = ' ';
-}
+char program[] = {[0 ... HEIGHT * WIDTH - 1] ' '};
+void **pc;
 
 void readProgram(char *filename) {
     // TODO: input too large
     FILE *fp = fopen(filename, "r");
-    for (int i = 0; i < HEIGHT; i++)
-        for (int j = 0; j < WIDTH; j++) {
-            int c = fgetc(fp);
-            if (c == '\n')
-                break;
-            if (c == EOF) {
-                fclose(fp);
-                return;
-            }
-            program[i][j] = c;
+    if (!fp) {
+        fprintf(stderr, "Error: couldn't open '%s' for input.\n", filename);
+        exit(-1);
+    }
+    int j = 0, i = 0;
+    for (;;) {
+        int c = fgetc(fp);
+        if (feof(fp))
+            goto eof;
+        if (c == '\n') {
+            i = 0;
+            j++;
+            if (j >= HEIGHT)
+                goto eof;
+        } else {
+            program[j * WIDTH + i] = c;
+            i++;
+            if (i >= WIDTH)
+                for (;;) {
+                    c = fgetc(fp);
+                    if (feof(fp))
+                        goto eof;
+                    if (c == '\n') {
+                        i = 0;
+                        j++;
+                        if (j >= HEIGHT)
+                            goto eof;
+                        break;
+                    }
+                }
         }
+    }
+eof:
     fclose(fp);
 }
 
-void printProgram() {
-    for (int i = 0; i < HEIGHT; i++) {
-        for (int j = 0; j < WIDTH; j++)
-            fprintf(stderr, "%c", program[i][j]);
-        fprintf(stderr, "\n");
-    }
-}
+// void printProgram() {
+//     for (int j = 0; j < HEIGHT; j++) {
+//         for (int i = 0; i < WIDTH; i++)
+//             fprintf(stderr, "%c", program[j * WIDTH + i]);
+//         fprintf(stderr, "\n");
+//     }
+// }
 
 int i = 0, j = 0;
-enum direction { right,
-                 left,
-                 down,
-                 up } dir = 0;
+int di = 1, dj = 0;
 
 void next() {
-    switch (dir) {
-    case 0:
-        j = (j + 1) % WIDTH;
-        break;
-    case 1:
-        j = (j - 1 + WIDTH) % WIDTH;
-        break;
-    case 2:
-        i = (i + 1) % HEIGHT;
-        break;
-    case 3:
-        i = (i - 1 + HEIGHT) % HEIGHT;
-    }
+    int temp1 = j, temp2 = i;
+    i = (i + di + WIDTH) % WIDTH;
+    j = (j + dj + HEIGHT) % HEIGHT;
+    pc += (j - temp1) * WIDTH + (i - temp2);
 }
 
 /* VM */
 
 void run() {
     //TODO: top of stack caching
-    //TODO: direct threading
 
 #define ASCII 128
-    static void *labels[ASCII];
-    for (int i = 0; i < ASCII; i++)
-        labels[i] = &&unsupported;
+    void *labels[] = {[0 ... ASCII - 1] = &&unsupported};
     for (char c = '0'; c <= '9'; c++)
         labels[c] = &&digit;
     labels['+'] = &&add;
@@ -166,14 +163,15 @@ void run() {
     labels['@'] = &&end;
     labels[' '] = &&nop;
 
-    void *program_as_labels[HEIGHT][WIDTH];
-    for (int i = 0; i < HEIGHT; i++)
-        for (int j = 0; j < WIDTH; j++)
-            program_as_labels[i][j] = labels[program[i][j]];
+    void *program_as_labels[HEIGHT * WIDTH];
+    for (int j = 0; j < HEIGHT; j++)
+        for (int i = 0; i < WIDTH; i++)
+            program_as_labels[j * WIDTH + i] = labels[program[j * WIDTH + i]];
+    pc = program_as_labels;
 
-    goto *program_as_labels[i][j];
+    goto **pc;
 digit:
-    push(program[i][j] - '0');
+    push(program[j * WIDTH + i] - '0');
     NEXT()
 add:
     push(pop() + pop());
@@ -186,9 +184,15 @@ subtract : {
 multiply:
     push(pop() * pop());
     NEXT()
-divide : { // TODO: division by 0
-    long temp = pop();
-    push(pop() / temp);
+divide : {
+    long temp1 = pop();
+    long temp2 = pop();
+    if (temp1 == 0) {
+        printf("What do you want %ld/0 to be? ", temp1);
+        scanf("%ld", &temp1);
+        push(temp1);
+    } else
+        push(temp2 / temp1);
     NEXT()
 }
 modulo : { // TODO: division by 0
@@ -204,33 +208,47 @@ greater : {
     NEXT()
 }
 right:
-    dir = right;
+    di = 1;
+    dj = 0;
     NEXT()
 left:
-    dir = left;
+    di = -1;
+    dj = 0;
     NEXT()
 down:
-    dir = down;
+    di = 0;
+    dj = 1;
     NEXT()
 up:
-    dir = up;
+    di = 0;
+    dj = -1;
     NEXT()
 random:
-    dir = rand() % 4;
-    NEXT()
+    switch (rand() % 4) {
+    case 0:
+        goto right;
+    case 1:
+        goto left;
+    case 2:
+        goto down;
+    case 3:
+        goto up;
+    }
 horizontal_if:
-    dir = pop() ? left : right;
-    NEXT()
+    if (pop())
+        goto left;
+    goto right;
 vertical_if:
-    dir = pop() ? up : down;
-    NEXT()
-stringmode: // move printStack
+    if (pop())
+        goto up;
+    goto down;
+stringmode:
     for (;;) {
         next();
         printStack(head);
-        if (program[i][j] == '"')
+        if (program[j * WIDTH + i] == '"')
             break;
-        push(program[i][j]);
+        push(program[j * WIDTH + i]);
     }
     NEXT()
 dup : {
@@ -251,9 +269,11 @@ pop:
     NEXT()
 output_int:
     printf("%ld ", pop());
+    fflush(stdout);
     NEXT()
 output_char:
     printf("%c", (char)pop());
+    fflush(stdout);
     NEXT()
 bridge:
     next();
@@ -265,7 +285,7 @@ get : {
         fprintf(stderr, "g 'Get' instruction out of bounds (%ld,%ld)\n", temp2, temp1);
         push(0);
     } else
-        push(program[temp1][temp2]);
+        push(program[temp1 * WIDTH + temp2]);
     NEXT()
 }
 put : {
@@ -275,17 +295,14 @@ put : {
         fprintf(stderr, "p 'Put' instruction out of bounds (%ld,%ld)\n", temp2, temp1);
         pop();
     } else {
-        program[temp1][temp2] = pop();
-        program_as_labels[temp1][temp2] = labels[program[temp1][temp2]];
+        program[temp1 * WIDTH + temp2] = pop();
+        program_as_labels[temp1 * WIDTH + temp2] = labels[program[temp1 * WIDTH + temp2]];
     }
     NEXT()
 }
 input_int : {
-    long temp;
-    if (scanf("%ld", &temp) != 1) {
-        fprintf(stderr, "Read failed");
-        exit(-1);
-    }
+    long temp = -1;
+    scanf("%ld", &temp);
     push(temp);
     NEXT()
 }
@@ -293,10 +310,12 @@ input_char:
     push(getchar());
     NEXT()
 end:
+    while (head)
+        pop();
     exit(0);
 nop:
     NEXT()
 unsupported:
-    fprintf(stderr, "Unsupported instruction '%c' (0x%x) (maybe not Befunge-93?)\n", program[i][j], program[i][j]);
+    fprintf(stderr, "Unsupported instruction '%c' (0x%02x) (maybe not Befunge-93?)\n", program[j * WIDTH + i], program[j * WIDTH + i]);
     NEXT()
 }
