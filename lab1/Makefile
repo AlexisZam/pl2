@@ -1,5 +1,5 @@
 CC = gcc
-CFLAGS = -O3 -Wall -Wno-char-subscripts
+CFLAGS = -O3 -Wall
 
 .PHONY:	all clean
 

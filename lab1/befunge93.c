@@ -7,6 +7,31 @@
     printStack(head); \
     goto *program_as_labels[i][j];
 
+/* Function prototypes */
+
+void initProgram();
+void readProgram(char *filename);
+void initStack();
+void run();
+
+/* Main program */
+
+int main(int argc, char *argv[]) {
+    if (argc != 2) {
+        fprintf(stderr, "Usage: ./befunge93 foo.bf\n");
+        return -1;
+    }
+
+    initProgram();
+    readProgram(argv[1]);
+
+    initStack();
+
+    srand(time(NULL));
+
+    run();
+}
+
 /* Stack */
 
 struct stack {
@@ -200,13 +225,12 @@ vertical_if:
     dir = pop() ? up : down;
     NEXT()
 stringmode: // move printStack
-    printStack(head);
     for (;;) {
         next();
+        printStack(head);
         if (program[i][j] == '"')
             break;
         push(program[i][j]);
-        printStack(head);
     }
     NEXT()
 dup : {
@@ -275,22 +299,4 @@ nop:
 unsupported:
     fprintf(stderr, "Unsupported instruction '%c' (0x%x) (maybe not Befunge-93?)\n", program[i][j], program[i][j]);
     NEXT()
-}
-
-/* Main program */
-
-int main(int argc, char *argv[]) {
-    if (argc != 2) {
-        fprintf(stderr, "Usage: ./befunge93 foo.bf\n");
-        return -1;
-    }
-
-    initProgram();
-    readProgram(argv[1]);
-
-    initStack();
-
-    srand(time(NULL));
-
-    run();
 }
