@@ -12,7 +12,6 @@ do
     diff befunge93.out bef.out
     diff befunge93.err bef.err
     diff befunge93.stack bef.stack
-    sleep 1
 done
 rm -f *out *err *stack
 make clean

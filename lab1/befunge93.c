@@ -2,6 +2,11 @@
 #include <stdlib.h>
 #include <time.h>
 
+#define NEXT()        \
+    next();           \
+    printStack(head); \
+    goto *program_as_labels[i][j];
+
 /* Stack */
 
 struct stack {
@@ -30,10 +35,11 @@ long pop() {
     return x;
 }
 
+#define STACK_FD 3
 void printStack() {
     for (struct stack *t = head; t; t = t->next)
-        dprintf(3, "%ld ", t->x);
-    dprintf(3, "\n");
+        dprintf(STACK_FD, "%ld ", t->x);
+    dprintf(STACK_FD, "\n");
 }
 
 /* Program */
@@ -49,7 +55,7 @@ void initProgram() {
 }
 
 void readProgram(char *filename) {
-    // todo: input too large
+    // TODO: input too large
     FILE *fp = fopen(filename, "r");
     for (int i = 0; i < HEIGHT; i++)
         for (int j = 0; j < WIDTH; j++) {
@@ -74,10 +80,13 @@ void printProgram() {
 }
 
 int i = 0, j = 0;
-int direction = 0;
+enum direction { right,
+                 left,
+                 down,
+                 up } dir = 0;
 
 void next() {
-    switch (direction) {
+    switch (dir) {
     case 0:
         j = (j + 1) % WIDTH;
         break;
@@ -95,153 +104,177 @@ void next() {
 /* VM */
 
 void run() {
+    //TODO: top of stack caching
+    //TODO: direct threading
+
+#define ASCII 128
+    static void *labels[ASCII];
+    for (int i = 0; i < ASCII; i++)
+        labels[i] = &&unsupported;
+    for (char c = '0'; c <= '9'; c++)
+        labels[c] = &&digit;
+    labels['+'] = &&add;
+    labels['-'] = &&subtract;
+    labels['*'] = &&multiply;
+    labels['/'] = &&divide;
+    labels['%'] = &&modulo;
+    labels['!'] = &&not;
+    labels['`'] = &&greater;
+    labels['>'] = &&right;
+    labels['<'] = &&left;
+    labels['v'] = &&down;
+    labels['^'] = &&up;
+    labels['?'] = &&random;
+    labels['_'] = &&horizontal_if;
+    labels['|'] = &&vertical_if;
+    labels['"'] = &&stringmode;
+    labels[':'] = &&dup;
+    labels['\\'] = &&swap;
+    labels['$'] = &&pop;
+    labels['.'] = &&output_int;
+    labels[','] = &&output_char;
+    labels['#'] = &&bridge;
+    labels['g'] = &&get;
+    labels['p'] = &&put;
+    labels['&'] = &&input_int;
+    labels['~'] = &&input_char;
+    labels['@'] = &&end;
+    labels[' '] = &&nop;
+
+    void *program_as_labels[HEIGHT][WIDTH];
+    for (int i = 0; i < HEIGHT; i++)
+        for (int j = 0; j < WIDTH; j++)
+            program_as_labels[i][j] = labels[program[i][j]];
+
+    goto *program_as_labels[i][j];
+digit:
+    push(program[i][j] - '0');
+    NEXT()
+add:
+    push(pop() + pop());
+    NEXT()
+subtract : {
+    long temp = pop();
+    push(pop() - temp);
+    NEXT()
+}
+multiply:
+    push(pop() * pop());
+    NEXT()
+divide : { // TODO: division by 0
+    long temp = pop();
+    push(pop() / temp);
+    NEXT()
+}
+modulo : { // TODO: division by 0
+    long temp = pop();
+    push(pop() % temp);
+    NEXT()
+}
+    not : push(!pop());
+    NEXT()
+greater : {
+    long temp = pop();
+    push(pop() > temp);
+    NEXT()
+}
+right:
+    dir = right;
+    NEXT()
+left:
+    dir = left;
+    NEXT()
+down:
+    dir = down;
+    NEXT()
+up:
+    dir = up;
+    NEXT()
+random:
+    dir = rand() % 4;
+    NEXT()
+horizontal_if:
+    dir = pop() ? left : right;
+    NEXT()
+vertical_if:
+    dir = pop() ? up : down;
+    NEXT()
+stringmode: // move printStack
+    printStack(head);
     for (;;) {
-        char command = program[i][j];
-        switch (command) {
-        case '0':
-        case '1':
-        case '2':
-        case '3':
-        case '4':
-        case '5':
-        case '6':
-        case '7':
-        case '8':
-        case '9':
-            push(command - '0');
-            break;
-        case '+':
-            push(pop() + pop());
-            break;
-        case '-': {
-            long temp = pop();
-            push(pop() - temp);
-            break;
-        }
-        case '*':
-            push(pop() * pop());
-            break;
-        case '/': {
-            // TODO: division by 0
-            long temp = pop();
-            push(pop() / temp);
-            break;
-        }
-        case '%': {
-            // TODO: division by 0
-            long temp = pop();
-            push(pop() % temp);
-            break;
-        }
-        case '!':
-            push(!pop());
-            break;
-        case '`': {
-            long temp = pop();
-            push(pop() > temp);
-            break;
-        }
-        case '>':
-            direction = 0;
-            break;
-        case '<':
-            direction = 1;
-            break;
-        case 'v':
-            direction = 2;
-            break;
-        case '^':
-            direction = 3;
-            break;
-        case '?':
-            direction = rand() % 4;
-            break;
-        case '_':
-            direction = pop() ? 1 : 0;
-            break;
-        case '|':
-            direction = pop() ? 3 : 2;
-            break;
-        case '"':
-            // fprintf(stderr, "%c: ", command);
-            printStack(head);
-            for (;;) {
-                next();
-                if (program[i][j] == '"')
-                    break;
-                push(program[i][j]);
-                // fprintf(stderr, "%c: ", command);
-                printStack(head);
-            }
-            break;
-        case ':': {
-            long temp = pop(head);
-            push(temp);
-            push(temp);
-            break;
-        }
-        case '\\': {
-            long temp1 = pop();
-            long temp2 = pop();
-            push(temp1);
-            push(temp2);
-            break;
-        }
-        case '$':
-            pop();
-            break;
-        case '.':
-            printf("%ld ", pop());
-            break;
-        case ',':
-            printf("%c", (char)pop());
-            break;
-        case '#':
-            next();
-            break;
-        case 'g': {
-            long i = pop();
-            long j = pop();
-            if (i < 0 || i >= HEIGHT || j < 0 || j >= WIDTH) {
-                fprintf(stderr, "g 'Get' instruction out of bounds (%ld,%ld)\n", j, i);
-                push(0);
-            } else
-                push(program[i][j]);
-            break;
-        }
-        case 'p': {
-            long i = pop();
-            long j = pop();
-            if (i < 0 || i >= HEIGHT || j < 0 || j >= WIDTH) {
-                fprintf(stderr, "p 'Put' instruction out of bounds (%ld,%ld)\n", j, i);
-                pop();
-            } else
-                program[i][j] = pop();
-            break;
-        }
-        case '&': {
-            long temp;
-            if (scanf("%ld", &temp) != 1) {
-                fprintf(stderr, "Read failed");
-                exit(-1);
-            }
-            push(temp);
-            break;
-        }
-        case '~':
-            push(getchar());
-            break;
-        case '@':
-            exit(0);
-        case ' ':
-            break;
-        default:
-            fprintf(stderr, "Unsupported instruction '%c' (0x%x) (maybe not Befunge-93?)\n", command, command);
-        }
         next();
-        // fprintf(stderr, "%c: ", command);
+        if (program[i][j] == '"')
+            break;
+        push(program[i][j]);
         printStack(head);
     }
+    NEXT()
+dup : {
+    long temp = pop(head);
+    push(temp);
+    push(temp);
+    NEXT()
+}
+swap : {
+    long temp1 = pop();
+    long temp2 = pop();
+    push(temp1);
+    push(temp2);
+    NEXT()
+}
+pop:
+    pop();
+    NEXT()
+output_int:
+    printf("%ld ", pop());
+    NEXT()
+output_char:
+    printf("%c", (char)pop());
+    NEXT()
+bridge:
+    next();
+    NEXT()
+get : {
+    long temp1 = pop();
+    long temp2 = pop();
+    if (temp1 < 0 || temp1 >= HEIGHT || temp2 < 0 || temp2 >= WIDTH) {
+        fprintf(stderr, "g 'Get' instruction out of bounds (%ld,%ld)\n", temp2, temp1);
+        push(0);
+    } else
+        push(program[temp1][temp2]);
+    NEXT()
+}
+put : {
+    long temp1 = pop();
+    long temp2 = pop();
+    if (temp1 < 0 || temp1 >= HEIGHT || temp2 < 0 || temp2 >= WIDTH) {
+        fprintf(stderr, "p 'Put' instruction out of bounds (%ld,%ld)\n", temp2, temp1);
+        pop();
+    } else {
+        program[temp1][temp2] = pop();
+        program_as_labels[temp1][temp2] = labels[program[temp1][temp2]];
+    }
+    NEXT()
+}
+input_int : {
+    long temp;
+    if (scanf("%ld", &temp) != 1) {
+        fprintf(stderr, "Read failed");
+        exit(-1);
+    }
+    push(temp);
+    NEXT()
+}
+input_char:
+    push(getchar());
+    NEXT()
+end:
+    exit(0);
+nop:
+    NEXT()
+unsupported:
+    fprintf(stderr, "Unsupported instruction '%c' (0x%x) (maybe not Befunge-93?)\n", program[i][j], program[i][j]);
+    NEXT()
 }
 
 /* Main program */
