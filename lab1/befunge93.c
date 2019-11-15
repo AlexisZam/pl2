@@ -2,7 +2,6 @@
 #include <stdlib.h>
 #include <time.h>
 
-// dprintf(STACK_FD, "%c: ", program[j * WIDTH + i]);
 #define NEXT()        \
     next();           \
     printStack(head); \
@@ -10,10 +9,21 @@
 
 /* Function prototypes */
 
-void initProgram();
-void readProgram(char *);
-void initStack();
-void run();
+void next();
+void push();
+long pop();
+void printStack();
+
+/* Globals */
+
+int i = 0, j = 0;
+int di = 1, dj = 0;
+void **pc;
+
+struct stack {
+    long x;
+    struct stack *next;
+} *head = NULL;
 
 /* Main program */
 
@@ -23,60 +33,15 @@ int main(int argc, char *argv[]) {
         return -1;
     }
 
-    readProgram(argv[1]);
-
-    srand(time(NULL));
-    run();
-}
-
-/* Stack */
-
-struct stack {
-    long x;
-    struct stack *next;
-} *head = NULL;
-
-void push(long x) {
-    struct stack *s = malloc(sizeof(struct stack));
-    s->x = x;
-    s->next = head;
-    head = s;
-}
-
-long pop() {
-    if (!head)
-        return 0;
-    struct stack *s = head;
-    long x = head->x;
-    head = s->next;
-    free(s);
-    return x;
-}
-
-#define STACK_FD 3
-void printStack() {
-#ifdef STACK
-    for (struct stack *t = head; t; t = t->next)
-        dprintf(STACK_FD, "%ld ", t->x);
-    dprintf(STACK_FD, "\n");
-#endif
-}
-
-/* Program */
-
 #define HEIGHT 25
 #define WIDTH 80
-char program[] = {[0 ... HEIGHT * WIDTH - 1] ' '};
-void **pc;
+    char program[] = {[0 ... HEIGHT * WIDTH - 1] ' '};
 
-void readProgram(char *filename) {
-    // TODO: input too large
-    FILE *fp = fopen(filename, "r");
+    FILE *fp = fopen(argv[1], "r");
     if (!fp) {
-        fprintf(stderr, "Error: couldn't open '%s' for input.\n", filename);
-        exit(-1);
+        fprintf(stderr, "Error: couldn't open '%s' for input.\n", argv[1]);
+        return -1;
     }
-    int j = 0, i = 0;
     for (;;) {
         int c = fgetc(fp);
         if (feof(fp))
@@ -106,30 +71,6 @@ void readProgram(char *filename) {
     }
 eof:
     fclose(fp);
-}
-
-// void printProgram() {
-//     for (int j = 0; j < HEIGHT; j++) {
-//         for (int i = 0; i < WIDTH; i++)
-//             fprintf(stderr, "%c", program[j * WIDTH + i]);
-//         fprintf(stderr, "\n");
-//     }
-// }
-
-int i = 0, j = 0;
-int di = 1, dj = 0;
-
-void next() {
-    int temp1 = j, temp2 = i;
-    i = (i + di + WIDTH) % WIDTH;
-    j = (j + dj + HEIGHT) % HEIGHT;
-    pc += (j - temp1) * WIDTH + (i - temp2);
-}
-
-/* VM */
-
-void run() {
-    //TODO: top of stack caching
 
 #define ASCII 128
     void *labels[] = {[0 ... ASCII - 1] = &&unsupported};
@@ -168,6 +109,10 @@ void run() {
         for (int i = 0; i < WIDTH; i++)
             program_as_labels[j * WIDTH + i] = labels[program[j * WIDTH + i]];
     pc = program_as_labels;
+    j = 0;
+    i = 0;
+
+    srand(time(NULL));
 
     goto **pc;
 digit:
@@ -312,10 +257,48 @@ input_char:
 end:
     while (head)
         pop();
-    exit(0);
+    return 0;
 nop:
     NEXT()
 unsupported:
     fprintf(stderr, "Unsupported instruction '%c' (0x%02x) (maybe not Befunge-93?)\n", program[j * WIDTH + i], program[j * WIDTH + i]);
     NEXT()
+}
+
+/* Program */
+
+void next() {
+    int temp1 = j, temp2 = i;
+    i = (i + di + WIDTH) % WIDTH;
+    j = (j + dj + HEIGHT) % HEIGHT;
+    pc += (j - temp1) * WIDTH + (i - temp2);
+}
+
+/* Stack */
+
+//TODO: top of stack caching
+void push(long x) {
+    struct stack *s = malloc(sizeof(struct stack));
+    s->x = x;
+    s->next = head;
+    head = s;
+}
+
+long pop() {
+    if (!head)
+        return 0;
+    struct stack *s = head;
+    long x = head->x;
+    head = s->next;
+    free(s);
+    return x;
+}
+
+void printStack() {
+#ifdef STACK
+#define STACK_FD 3
+    for (struct stack *t = head; t; t = t->next)
+        dprintf(STACK_FD, "%ld ", t->x);
+    dprintf(STACK_FD, "\n");
+#endif /* STACK */
 }
