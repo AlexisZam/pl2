@@ -35,7 +35,7 @@ int main(int argc, char *argv[]) {
 
 #define HEIGHT 25
 #define WIDTH 80
-    char program[] = {[0 ... HEIGHT * WIDTH - 1] ' '};
+    char program[] = {[0 ... HEIGHT * WIDTH - 1] = ' '};
 
     FILE *fp = fopen(argv[1], "r");
     if (!fp) {
