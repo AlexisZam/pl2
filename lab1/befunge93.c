@@ -277,6 +277,7 @@ void next() {
 /* Stack */
 
 //TODO: top of stack caching
+//TODO: replace with table with realloc
 void push(long x) {
     struct stack *s = malloc(sizeof(struct stack));
     s->x = x;
