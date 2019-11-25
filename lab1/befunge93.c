@@ -1,29 +1,29 @@
+#include "stack.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <time.h>
 
-#define NEXT()        \
-    next();           \
-    printStack(head); \
+#ifdef IMMEDIATE_THREADING
+#define NEXT()    \
+    next();       \
+    printStack(); \
     goto **pc;
+#else
+#define NEXT()    \
+    next();       \
+    printStack(); \
+    break;
+#endif
 
 /* Function prototypes */
 
 void next();
-void push();
-long pop();
-void printStack();
 
 /* Globals */
 
 int i = 0, j = 0;
 int di = 1, dj = 0;
 void **pc;
-
-struct stack {
-    long x;
-    struct stack *next;
-} *head = NULL;
 
 /* Main program */
 
@@ -114,155 +114,198 @@ eof:
 
     srand(time(NULL));
 
-    goto **pc;
-digit:
-    push(program[j * WIDTH + i] - '0');
-    NEXT()
-add:
-    push(pop() + pop());
-    NEXT()
-subtract : {
-    long temp = pop();
-    push(pop() - temp);
-    NEXT()
-}
-multiply:
-    push(pop() * pop());
-    NEXT()
-divide : {
-    long temp1 = pop();
-    long temp2 = pop();
-    if (temp1 == 0) {
-        printf("What do you want %ld/0 to be? ", temp1);
-        scanf("%ld", &temp1);
-        push(temp1);
-    } else
-        push(temp2 / temp1);
-    NEXT()
-}
-modulo : { // TODO: division by 0
-    long temp = pop();
-    push(pop() % temp);
-    NEXT()
-}
-    not : push(!pop());
-    NEXT()
-greater : {
-    long temp = pop();
-    push(pop() > temp);
-    NEXT()
-}
-right:
-    di = 1;
-    dj = 0;
-    NEXT()
-left:
-    di = -1;
-    dj = 0;
-    NEXT()
-down:
-    di = 0;
-    dj = 1;
-    NEXT()
-up:
-    di = 0;
-    dj = -1;
-    NEXT()
-random:
-    switch (rand() % 4) {
-    case 0:
-        goto right;
-    case 1:
-        goto left;
-    case 2:
-        goto down;
-    case 3:
-        goto up;
-    }
-horizontal_if:
-    if (pop())
-        goto left;
-    goto right;
-vertical_if:
-    if (pop())
-        goto up;
-    goto down;
-stringmode:
+    initStack();
+
     for (;;) {
-        next();
-        printStack(head);
-        if (program[j * WIDTH + i] == '"')
-            break;
-        push(program[j * WIDTH + i]);
+        // goto **pc;
+        switch (program[j * WIDTH + i]) {
+        case '0':
+        case '1':
+        case '2':
+        case '3':
+        case '4':
+        case '5':
+        case '6':
+        case '7':
+        case '8':
+        case '9':
+        digit:
+            push(program[j * WIDTH + i] - '0');
+            NEXT()
+        case '+':
+        add:
+            push(pop() + pop());
+            NEXT()
+        case '-':
+        subtract : {
+            long temp = pop();
+            push(pop() - temp);
+            NEXT()
+        }
+        case '*':
+        multiply:
+            push(pop() * pop());
+            NEXT()
+        case '/':
+        divide : {
+            long temp1 = pop();
+            long temp2 = pop();
+            if (temp1 == 0) {
+                printf("What do you want %ld/0 to be? ", temp1);
+                scanf("%ld", &temp1);
+                push(temp1);
+            } else
+                push(temp2 / temp1);
+            NEXT()
+        }
+        case '%':
+        modulo : { // TODO: division by 0
+            long temp = pop();
+            push(pop() % temp);
+            NEXT()
+        }
+        case '!':
+            not : push(!pop());
+            NEXT()
+        case '`':
+        greater : {
+            long temp = pop();
+            push(pop() > temp);
+            NEXT()
+        }
+        case '>':
+        right:
+            di = 1;
+            dj = 0;
+            NEXT()
+        case '<':
+        left:
+            di = -1;
+            dj = 0;
+            NEXT()
+        case 'v':
+        down:
+            di = 0;
+            dj = 1;
+            NEXT()
+        case '^':
+        up:
+            di = 0;
+            dj = -1;
+            NEXT()
+        case '?':
+        random:
+            switch (rand() % 4) {
+            case 0:
+                goto right;
+            case 1:
+                goto left;
+            case 2:
+                goto down;
+            case 3:
+                goto up;
+            }
+        case '_':
+        horizontal_if:
+            if (pop())
+                goto left;
+            goto right;
+        case '|':
+        vertical_if:
+            if (pop())
+                goto up;
+            goto down;
+        case '"':
+        stringmode:
+            for (;;) {
+                next();
+                printStack(head);
+                if (program[j * WIDTH + i] == '"')
+                    break;
+                push(program[j * WIDTH + i]);
+            }
+            NEXT()
+        case ':':
+        dup : {
+            long temp = pop(head);
+            push(temp);
+            push(temp);
+            NEXT()
+        }
+        case '\\':
+        swap : {
+            long temp1 = pop();
+            long temp2 = pop();
+            push(temp1);
+            push(temp2);
+            NEXT()
+        }
+        case '$':
+        pop:
+            pop();
+            NEXT()
+        case '.':
+        output_int:
+            printf("%ld ", pop());
+            fflush(stdout);
+            NEXT()
+        case ',':
+        output_char:
+            printf("%c", (char)pop());
+            fflush(stdout);
+            NEXT()
+        case '#':
+        bridge:
+            next();
+            NEXT()
+        case 'g':
+        get : {
+            long temp1 = pop();
+            long temp2 = pop();
+            if (temp1 < 0 || temp1 >= HEIGHT || temp2 < 0 || temp2 >= WIDTH) {
+                fprintf(stderr, "g 'Get' instruction out of bounds (%ld,%ld)\n", temp2, temp1);
+                push(0);
+            } else
+                push(program[temp1 * WIDTH + temp2]);
+            NEXT()
+        }
+        case 'p':
+        put : {
+            long temp1 = pop();
+            long temp2 = pop();
+            if (temp1 < 0 || temp1 >= HEIGHT || temp2 < 0 || temp2 >= WIDTH) {
+                fprintf(stderr, "p 'Put' instruction out of bounds (%ld,%ld)\n", temp2, temp1);
+                pop();
+            } else {
+                program[temp1 * WIDTH + temp2] = pop();
+                program_as_labels[temp1 * WIDTH + temp2] = labels[program[temp1 * WIDTH + temp2]];
+            }
+            NEXT()
+        }
+        case '&':
+        input_int : {
+            long temp = -1;
+            scanf("%ld", &temp);
+            push(temp);
+            NEXT()
+        }
+        case '~':
+        input_char:
+            push(getchar());
+            NEXT()
+        case '@':
+        end:
+            freeStack();
+            return 0;
+        case ' ':
+        nop:
+            NEXT()
+        default:
+        unsupported:
+            fprintf(stderr, "Unsupported instruction '%c' (0x%02x) (maybe not Befunge-93?)\n", program[j * WIDTH + i], program[j * WIDTH + i]);
+            NEXT()
+        }
     }
-    NEXT()
-dup : {
-    long temp = pop(head);
-    push(temp);
-    push(temp);
-    NEXT()
-}
-swap : {
-    long temp1 = pop();
-    long temp2 = pop();
-    push(temp1);
-    push(temp2);
-    NEXT()
-}
-pop:
-    pop();
-    NEXT()
-output_int:
-    printf("%ld ", pop());
-    fflush(stdout);
-    NEXT()
-output_char:
-    printf("%c", (char)pop());
-    fflush(stdout);
-    NEXT()
-bridge:
-    next();
-    NEXT()
-get : {
-    long temp1 = pop();
-    long temp2 = pop();
-    if (temp1 < 0 || temp1 >= HEIGHT || temp2 < 0 || temp2 >= WIDTH) {
-        fprintf(stderr, "g 'Get' instruction out of bounds (%ld,%ld)\n", temp2, temp1);
-        push(0);
-    } else
-        push(program[temp1 * WIDTH + temp2]);
-    NEXT()
-}
-put : {
-    long temp1 = pop();
-    long temp2 = pop();
-    if (temp1 < 0 || temp1 >= HEIGHT || temp2 < 0 || temp2 >= WIDTH) {
-        fprintf(stderr, "p 'Put' instruction out of bounds (%ld,%ld)\n", temp2, temp1);
-        pop();
-    } else {
-        program[temp1 * WIDTH + temp2] = pop();
-        program_as_labels[temp1 * WIDTH + temp2] = labels[program[temp1 * WIDTH + temp2]];
-    }
-    NEXT()
-}
-input_int : {
-    long temp = -1;
-    scanf("%ld", &temp);
-    push(temp);
-    NEXT()
-}
-input_char:
-    push(getchar());
-    NEXT()
-end:
-    while (head)
-        pop();
-    return 0;
-nop:
-    NEXT()
-unsupported:
-    fprintf(stderr, "Unsupported instruction '%c' (0x%02x) (maybe not Befunge-93?)\n", program[j * WIDTH + i], program[j * WIDTH + i]);
-    NEXT()
 }
 
 /* Program */
@@ -272,34 +315,4 @@ void next() {
     i = (i + di + WIDTH) % WIDTH;
     j = (j + dj + HEIGHT) % HEIGHT;
     pc += (j - temp1) * WIDTH + (i - temp2);
-}
-
-/* Stack */
-
-//TODO: top of stack caching
-//TODO: replace with table with realloc
-void push(long x) {
-    struct stack *s = malloc(sizeof(struct stack));
-    s->x = x;
-    s->next = head;
-    head = s;
-}
-
-long pop() {
-    if (!head)
-        return 0;
-    struct stack *s = head;
-    long x = head->x;
-    head = s->next;
-    free(s);
-    return x;
-}
-
-void printStack() {
-#ifdef STACK
-#define STACK_FD 3
-    for (struct stack *t = head; t; t = t->next)
-        dprintf(STACK_FD, "%ld ", t->x);
-    dprintf(STACK_FD, "\n");
-#endif /* STACK */
 }
