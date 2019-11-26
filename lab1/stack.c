@@ -5,91 +5,132 @@
 
 #ifdef LINKED_LIST
 
-struct stack {
-    long value;
-    struct stack *next;
-} *head = NULL;
+#ifdef BEFUNGE93PLUS
+emum type{LONG, ADDRESS};
+#endif
 
-void initStack() {}
+struct stack {
+#ifdef BEFUNGE93PLUS
+    enum type type;
+#endif
+    long value; // TODO: int64_t
+    struct stack *next;
+} *stack = NULL;
+
+void init_stack() {}
 
 //TODO: top of stack caching
 void push(long value) {
     struct stack *s = malloc(sizeof(struct stack));
     s->value = value;
-    s->next = head;
-    head = s;
+    s->next = stack;
+    stack = s;
 }
 
 long pop() {
-    if (!head)
+    if (!stack)
         return 0;
-    struct stack *s = head;
-    long value = head->value;
-    head = head->next;
+    struct stack *s = stack;
+    long value = stack->value;
+    stack = stack->next;
     free(s);
     return value;
 }
 
-void freeStack() {
+void free_stack() {
     struct stack *s;
-    while (head) {
-        s = head;
-        head = head->next;
+    while (stack) {
+        s = stack;
+        stack = stack->next;
         free(s);
     }
 }
 
-void printStack() {
-#ifdef STACK
-    for (struct stack *s = head; s; s = s->next)
+void print_stack() {
+#ifdef PRINT_STACK
+    for (struct stack *s = stack; s; s = s->next)
         dprintf(STACK_FD, "%ld ", s->value);
     dprintf(STACK_FD, "\n");
-#endif /* STACK */
+#endif
 }
 
-#else
+#elif defined DYNAMIC_ARRAY
 
 struct stack {
     int size; // TODO: size_t
     int top;
     long *values;
-} head = {.size = 0, .top = 0, .values = NULL};
+} stack = {.size = 0, .top = 0, .values = NULL};
 
-// TODO: for (practically) static array change INIT_SIZE to a very large number
-void initStack() {
+void init_stack() {
 #define INIT_SIZE 1024
-    head.size = INIT_SIZE;
-    head.top = 0;
-    head.values = malloc(head.size * sizeof(long));
+    stack.size = INIT_SIZE;
+    stack.values = malloc(stack.size * sizeof(long));
 }
 
 void push(long value) {
-    if (head.top == head.size) {
-        head.size *= 2;
-        head.values = realloc(head.values, head.size * sizeof(long));
+    if (stack.top == stack.size) {
+        stack.size *= 2;
+        stack.values = realloc(stack.values, stack.size * sizeof(long));
     }
-    head.values[head.top++] = value;
+    stack.values[stack.top++] = value;
 }
 
 long pop() {
-    if (!head.top)
+    if (!stack.top)
         return 0;
-    return head.values[--head.top];
+    return stack.values[--stack.top];
 }
 
-void freeStack() {
-    head.size = 0;
-    head.top = 0;
-    free(head.values);
-    head.values = NULL;
+void free_stack() {
+    stack.size = 0;
+    stack.top = 0;
+    free(stack.values);
+    stack.values = NULL;
 }
 
-void printStack() {
-#ifdef STACK
-    for (int i = head.top - 1; i >= 0; i--)
-        dprintf(STACK_FD, "%ld ", head.values[i]);
+void print_stack() {
+#ifdef PRINT_STACK
+    for (int i = stack.top - 1; i >= 0; i--)
+        dprintf(STACK_FD, "%ld ", stack.values[i]);
     dprintf(STACK_FD, "\n");
-#endif /* STACK */
+#endif
+}
+
+#elif defined STATIC_ARRAY
+
+#define STACK_SIZE 1024 * 1024
+struct stack {
+    int top;
+    long values[STACK_SIZE];
+} stack = {.top = 0};
+
+void init_stack() {}
+
+void push(long value) {
+    if (stack.top == STACK_SIZE) {
+        fprintf(stderr, "Stack overflow");
+        exit(-1);
+    }
+    stack.values[stack.top++] = value;
+}
+
+long pop() {
+    if (!stack.top)
+        return 0;
+    return stack.values[--stack.top];
+}
+
+void free_stack() {
+    stack.top = 0;
+}
+
+void print_stack() {
+#ifdef PRINT_STACK
+    for (int i = stack.top - 1; i >= 0; i--)
+        dprintf(STACK_FD, "%ld ", stack.values[i]);
+    dprintf(STACK_FD, "\n");
+#endif
 }
 
 #endif

@@ -1,9 +1,7 @@
 #pragma once
 
-extern struct stack *head;
-
-void initStack();
+void init_stack();
 void push(long);
 long pop();
-void freeStack();
-void printStack();
+void free_stack();
+void print_stack();

@@ -1,17 +1,25 @@
+#ifdef BEFUNGE93PLUS
+#include "heap.h"
+#endif
 #include "stack.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <time.h>
 
-#ifdef IMMEDIATE_THREADING
-#define NEXT()    \
-    next();       \
-    printStack(); \
+#ifdef DIRECT_THREADING
+#define NEXT()     \
+    next();        \
+    print_stack(); \
     goto **pc;
-#else
-#define NEXT()    \
-    next();       \
-    printStack(); \
+#elif defined INDIRECT_THREADING
+#define NEXT()     \
+    next();        \
+    print_stack(); \
+    goto *labels[program[j * WIDTH + i]];
+#elif defined NO_THREADING
+#define NEXT()     \
+    next();        \
+    print_stack(); \
     break;
 #endif
 
@@ -73,6 +81,7 @@ eof:
     fclose(fp);
 
 #define ASCII 128
+#if defined DIRECT_THREADING || defined INDIRECT_THREADING
     void *labels[] = {[0 ... ASCII - 1] = &&unsupported};
     for (char c = '0'; c <= '9'; c++)
         labels[c] = &&digit;
@@ -103,18 +112,27 @@ eof:
     labels['~'] = &&input_char;
     labels['@'] = &&end;
     labels[' '] = &&nop;
+#ifdef BEFUNGE93PLUS
+    labels['c'] = &&cons;
+    labels['h'] = &&head;
+    labels['t'] = &&tail;
+#endif
+#endif
 
+#ifdef DIRECT_THREADING
     void *program_as_labels[HEIGHT * WIDTH];
     for (int j = 0; j < HEIGHT; j++)
         for (int i = 0; i < WIDTH; i++)
             program_as_labels[j * WIDTH + i] = labels[program[j * WIDTH + i]];
     pc = program_as_labels;
+#endif
+
     j = 0;
     i = 0;
 
     srand(time(NULL));
 
-    initStack();
+    init_stack();
 
     for (;;) {
         // goto **pc;
@@ -219,7 +237,7 @@ eof:
         stringmode:
             for (;;) {
                 next();
-                printStack(head);
+                print_stack();
                 if (program[j * WIDTH + i] == '"')
                     break;
                 push(program[j * WIDTH + i]);
@@ -227,7 +245,7 @@ eof:
             NEXT()
         case ':':
         dup : {
-            long temp = pop(head);
+            long temp = pop();
             push(temp);
             push(temp);
             NEXT()
@@ -278,7 +296,9 @@ eof:
                 pop();
             } else {
                 program[temp1 * WIDTH + temp2] = pop();
+#ifdef DIRECT_THREADING
                 program_as_labels[temp1 * WIDTH + temp2] = labels[program[temp1 * WIDTH + temp2]];
+#endif
             }
             NEXT()
         }
@@ -295,11 +315,27 @@ eof:
             NEXT()
         case '@':
         end:
-            freeStack();
+            free_stack();
             return 0;
         case ' ':
         nop:
             NEXT()
+#ifdef BEFUNGE93PLUS
+        case 'c':
+        cons : {
+            long temp = pop();
+            push(allocate(pop(), temp));
+            NEXT()
+        }
+        case 'h':
+        head:
+            push(head(pop()));
+            NEXT()
+        case 't':
+        tail:
+            push(tail(pop()));
+            NEXT()
+#endif
         default:
         unsupported:
             fprintf(stderr, "Unsupported instruction '%c' (0x%02x) (maybe not Befunge-93?)\n", program[j * WIDTH + i], program[j * WIDTH + i]);
