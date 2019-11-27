@@ -137,58 +137,49 @@ eof:
     for (;;) {
         // goto **pc;
         switch (program[j * WIDTH + i]) {
-        case '0':
-        case '1':
-        case '2':
-        case '3':
-        case '4':
-        case '5':
-        case '6':
-        case '7':
-        case '8':
-        case '9':
+        case '0' ... '9':
         digit:
-            push(program[j * WIDTH + i] - '0');
+            push_value(program[j * WIDTH + i] - '0');
             NEXT()
         case '+':
         add:
-            push(pop() + pop());
+            push_value(pop_value() + pop_value());
             NEXT()
         case '-':
         subtract : {
-            long temp = pop();
-            push(pop() - temp);
+            long temp = pop_value();
+            push_value(pop_value() - temp);
             NEXT()
         }
         case '*':
         multiply:
-            push(pop() * pop());
+            push_value(pop_value() * pop_value());
             NEXT()
         case '/':
         divide : {
-            long temp1 = pop();
-            long temp2 = pop();
+            long temp1 = pop_value();
+            long temp2 = pop_value();
             if (temp1 == 0) {
                 printf("What do you want %ld/0 to be? ", temp1);
                 scanf("%ld", &temp1);
-                push(temp1);
+                push_value(temp1);
             } else
-                push(temp2 / temp1);
+                push_value(temp2 / temp1);
             NEXT()
         }
         case '%':
         modulo : { // TODO: division by 0
-            long temp = pop();
-            push(pop() % temp);
+            long temp = pop_value();
+            push_value(pop_value() % temp);
             NEXT()
         }
         case '!':
-            not : push(!pop());
+            not : push_value(!pop_value());
             NEXT()
         case '`':
         greater : {
-            long temp = pop();
-            push(pop() > temp);
+            long temp = pop_value();
+            push_value(pop_value() > temp);
             NEXT()
         }
         case '>':
@@ -225,12 +216,12 @@ eof:
             }
         case '_':
         horizontal_if:
-            if (pop())
+            if (pop_value())
                 goto left;
             goto right;
         case '|':
         vertical_if:
-            if (pop())
+            if (pop_value())
                 goto up;
             goto down;
         case '"':
@@ -240,36 +231,36 @@ eof:
                 print_stack();
                 if (program[j * WIDTH + i] == '"')
                     break;
-                push(program[j * WIDTH + i]);
+                push_value(program[j * WIDTH + i]);
             }
             NEXT()
         case ':':
         dup : {
-            long temp = pop();
-            push(temp);
-            push(temp);
+            long temp = pop_value();
+            push_value(temp);
+            push_value(temp);
             NEXT()
         }
         case '\\':
         swap : {
-            long temp1 = pop();
-            long temp2 = pop();
-            push(temp1);
-            push(temp2);
+            long temp1 = pop_value();
+            long temp2 = pop_value();
+            push_value(temp1);
+            push_value(temp2);
             NEXT()
         }
         case '$':
         pop:
-            pop();
+            pop_value();
             NEXT()
         case '.':
         output_int:
-            printf("%ld ", pop());
+            printf("%ld ", pop_value());
             fflush(stdout);
             NEXT()
         case ',':
         output_char:
-            printf("%c", (char)pop());
+            printf("%c", (char)pop_value());
             fflush(stdout);
             NEXT()
         case '#':
@@ -278,24 +269,24 @@ eof:
             NEXT()
         case 'g':
         get : {
-            long temp1 = pop();
-            long temp2 = pop();
+            long temp1 = pop_value();
+            long temp2 = pop_value();
             if (temp1 < 0 || temp1 >= HEIGHT || temp2 < 0 || temp2 >= WIDTH) {
                 fprintf(stderr, "g 'Get' instruction out of bounds (%ld,%ld)\n", temp2, temp1);
-                push(0);
+                push_value(0);
             } else
-                push(program[temp1 * WIDTH + temp2]);
+                push_value(program[temp1 * WIDTH + temp2]);
             NEXT()
         }
         case 'p':
         put : {
-            long temp1 = pop();
-            long temp2 = pop();
+            long temp1 = pop_value();
+            long temp2 = pop_value();
             if (temp1 < 0 || temp1 >= HEIGHT || temp2 < 0 || temp2 >= WIDTH) {
                 fprintf(stderr, "p 'Put' instruction out of bounds (%ld,%ld)\n", temp2, temp1);
-                pop();
+                pop_value();
             } else {
-                program[temp1 * WIDTH + temp2] = pop();
+                program[temp1 * WIDTH + temp2] = pop_value();
 #ifdef DIRECT_THREADING
                 program_as_labels[temp1 * WIDTH + temp2] = labels[program[temp1 * WIDTH + temp2]];
 #endif
@@ -306,12 +297,12 @@ eof:
         input_int : {
             long temp = -1;
             scanf("%ld", &temp);
-            push(temp);
+            push_value(temp);
             NEXT()
         }
         case '~':
         input_char:
-            push(getchar());
+            push_value(getchar());
             NEXT()
         case '@':
         end:
@@ -323,17 +314,17 @@ eof:
 #ifdef BEFUNGE93PLUS
         case 'c':
         cons : {
-            long temp = pop();
-            push(allocate(pop(), temp));
+            long temp = pop_value();
+            push_heap_address(allocate(pop_value(), temp));
             NEXT()
         }
         case 'h':
         head:
-            push(head(pop()));
+            push_heap_address(head(pop_heap_address()).value);
             NEXT()
         case 't':
         tail:
-            push(tail(pop()));
+            push_heap_address(tail(pop_heap_address()).value);
             NEXT()
 #endif
         default:

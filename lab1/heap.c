@@ -1,30 +1,58 @@
+#include "stack.h"
+#include <stdio.h>
 
 struct cons_cell {
-    long head;
-    long tail;
+    value_t head;
+    value_t tail;
 };
 
-#define HEAP_SIZE (1024 * 1024)
-struct heap {
-    long top; // TODO: size_t
-    struct cons_cell cons_cells[HEAP_SIZE];
-} heap;
+#ifdef MARK_AND_SWEEP
+
+#define HEAP_SIZE 1024 * 1024
+struct cons_cell heap[HEAP_SIZE];
+
+int64_t freelist;
+
+int64_t allocate(int64_t head, int64_t tail) {
+    if (freelist == HEAP_SIZE)
+        gc();
+    int64_t address = freelist;
+    freelist = heap[freelist].head.value;
+    heap[freelist] = (struct cons_cell){head, tail};
+    return address;
+}
+
+value_t head(int64_t address) {
+    return heap[address].head;
+}
+
+value_t tail(int64_t address) {
+    return heap[address].tail;
+}
+
+void sweep() {
+    for (int i = 0; i < HEAP_SIZE; i++) {
+        if (heap[i].head.marked) {
+            heap[i].head.marked = false;
+            heap[i].tail.marked = false;
+        } else {
+            heap[i].head.value = freelist;
+            freelist = i;
+        }
+    }
+}
 
 void gc() {
+    mark();
+    sweep();
+    if (freelist == HEAP_SIZE) {
+        fprintf(stderr, "Heap out of memory");
+        exit(-1);
+    }
 }
 
-long allocate(long head, long tail) {
-    if (heap.top == HEAP_SIZE)
-        gc();
-    struct cons_cell cc = {.head = head, .tail = tail};
-    heap.cons_cells[heap.top] = cc;
-    return heap.top++;
-}
+#elif defined COPYING
 
-long head(long address) {
-    return heap.cons_cells[address].head;
-}
+// TODO
 
-long tail(long address) {
-    return heap.cons_cells[address].tail;
-}
+#endif
