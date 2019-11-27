@@ -314,7 +314,7 @@ eof:
 #ifdef BEFUNGE93PLUS
         case 'c':
         cons : {
-            long temp = pop_value();
+            value_t temp = pop();
             push_heap_address(allocate(pop(), temp));
             NEXT()
         }

@@ -1,5 +1,5 @@
 CC = gcc
-CFLAGS = -O3 -Wall -Wextra -Wno-char-subscripts -Wno-unused-result
+CFLAGS = -O3 -Wall -Wextra -Wpedantic -Wno-char-subscripts -Wno-unused-result
 THREADING ?= -D DIRECT_THREADING# -D INDIRECT_THREADING -D NO_THREADING
 STACK ?= -D DYNAMIC_ARRAY# -D STATIC_ARRAY -D LINKED_LIST
 PRINT_STACK ?= -D PRINT_STACK
