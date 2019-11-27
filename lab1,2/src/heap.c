@@ -1,25 +1,46 @@
 #include "stack.h"
 #include <stdio.h>
+#include <stdlib.h>
 
 struct cons_cell {
-    value_t head;
-    value_t tail;
+    struct value head;
+    struct value tail;
 };
 
-#ifdef MARK_AND_SWEEP
+#define HEAP_SIZE 10
+struct {
+    int freelist;
+    struct cons_cell cons_cells[HEAP_SIZE];
+} heap = {0};
 
-#define HEAP_SIZE 1024 * 1024
-struct cons_cell heap[HEAP_SIZE];
+#define HEAP_FD 4
+void print_heap() {
+#ifdef PRINT_HEAP
+    int temp = heap.freelist;
+    for (int i = 0; i < HEAP_SIZE; i++)
+        if (i == temp)
+            temp = heap.cons_cells[temp].head.value;
+        else
+            dprintf(HEAP_FD, "(%ld:%d,%ld:%d) ",
+                    heap.cons_cells[i].head.value, heap.cons_cells[i].head.type,
+                    heap.cons_cells[i].tail.value, heap.cons_cells[i].tail.type);
+    dprintf(HEAP_FD, "\n");
+    sleep(3);
+#endif /* PRINT_HEAP */
+}
 
-int64_t freelist = 0;
+void init_heap() {
+    for (int i = 0; i < HEAP_SIZE; i++)
+        heap.cons_cells[i].head.value = i + 1;
+}
 
 void sweep() {
-    for (int i = 0; i < HEAP_SIZE; i++) {
-        if (heap[i].head.marked)
-            heap[i].head.marked = heap[i].tail.marked = false;
+    for (int i = HEAP_SIZE - 1; i >= 0; i--) {
+        if (heap.cons_cells[i].head.marked)
+            heap.cons_cells[i].head.marked = heap.cons_cells[i].tail.marked = false;
         else {
-            heap[i].head.value = freelist;
-            freelist = i;
+            heap.cons_cells[i].head.value = heap.freelist;
+            heap.freelist = i;
         }
     }
 }
@@ -27,34 +48,31 @@ void sweep() {
 void gc() {
     mark();
     sweep();
-    if (freelist == HEAP_SIZE) {
+    if (heap.freelist == HEAP_SIZE - 1) {
 #ifdef DYNAMIC_HEAP
         // TODO: realloc
-#else /* STATIC_HEAP */
-        fprintf(stderr, "Heap out of memory");
-#endif
+#else
+        fprintf(stderr, "Heap overflow\n");
+        exit(-1);
+#endif /* DYNAMIC_HEAP */
     }
 }
 
-int64_t allocate(value_t head, value_t tail) {
-    if (freelist == HEAP_SIZE)
+int allocate(struct value head, struct value tail) {
+    if (heap.freelist == HEAP_SIZE - 1)
         gc();
-    int64_t address = freelist;
-    freelist = heap[freelist].head.value;
-    heap[freelist] = (struct cons_cell){head, tail};
+    int64_t address = heap.freelist;
+    heap.freelist = heap.cons_cells[heap.freelist].head.value;
+    heap.cons_cells[heap.freelist] = (struct cons_cell){head, tail};
     return address;
 }
 
-value_t head(int64_t address) {
-    return heap[address].head;
+struct value head(int address) {
+    return heap.cons_cells[address].head;
 }
 
-value_t tail(int64_t address) {
-    return heap[address].tail;
+struct value tail(int address) {
+    return heap.cons_cells[address].tail;
 }
 
-#elif defined COPYING
-
-// TODO
-
-#endif
+// TODO: copying

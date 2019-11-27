@@ -1,58 +1,54 @@
 #ifdef BEFUNGE93PLUS
 #include "heap.h"
-#endif
+#endif /* BEFUNGE93PLUS */
 #include "stack.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <time.h>
 
+#ifdef THREADING
 #ifdef DIRECT_THREADING
 #define NEXT()     \
     next();        \
     print_stack(); \
     goto **pc;
-#elif defined INDIRECT_THREADING
+#else
 #define NEXT()     \
     next();        \
     print_stack(); \
     goto *labels[program[j * WIDTH + i]];
-#elif defined NO_THREADING
+#endif /* DIRECT_STHREADING */
+#else
 #define NEXT()     \
     next();        \
     print_stack(); \
     break;
-#endif
-
-/* Function prototypes */
-
-void next();
-
-/* Globals */
+#endif /* THREADING */
 
 int i = 0, j = 0;
 int di = 1, dj = 0;
 void **pc;
 
-/* Main program */
-
-int main(int argc, char *argv[]) {
-    if (argc != 2) {
-        fprintf(stderr, "Usage: ./befunge93 foo.bf\n");
-        return -1;
-    }
-
 #define HEIGHT 25
 #define WIDTH 80
-    char program[] = {[0 ... HEIGHT * WIDTH - 1] = ' '};
+char program[] = {[0 ... HEIGHT * WIDTH - 1] = ' '};
 
-    FILE *fp = fopen(argv[1], "r");
-    if (!fp) {
-        fprintf(stderr, "Error: couldn't open '%s' for input.\n", argv[1]);
-        return -1;
+void next() {
+    int temp1 = j, temp2 = i;
+    i = (i + di + WIDTH) % WIDTH;
+    j = (j + dj + HEIGHT) % HEIGHT;
+    pc += (j - temp1) * WIDTH + (i - temp2);
+}
+
+void parse_program(const char *filename) {
+    FILE *stream = fopen(filename, "r");
+    if (!stream) {
+        fprintf(stderr, "Error: couldn't open '%s' for input.\n", filename);
+        exit(-1);
     }
     for (;;) {
-        int c = fgetc(fp);
-        if (feof(fp))
+        int c = fgetc(stream);
+        if (feof(stream))
             goto eof;
         if (c == '\n') {
             i = 0;
@@ -64,8 +60,8 @@ int main(int argc, char *argv[]) {
             i++;
             if (i >= WIDTH)
                 for (;;) {
-                    c = fgetc(fp);
-                    if (feof(fp))
+                    c = fgetc(stream);
+                    if (feof(stream))
                         goto eof;
                     if (c == '\n') {
                         i = 0;
@@ -78,10 +74,19 @@ int main(int argc, char *argv[]) {
         }
     }
 eof:
-    fclose(fp);
+    fclose(stream);
+}
+
+int main(int argc, char *argv[]) {
+    if (argc != 2) {
+        fprintf(stderr, "Usage: ./befunge93 foo.bf\n");
+        return -1;
+    }
+
+    parse_program(argv[1]);
 
 #define ASCII 128
-#if defined DIRECT_THREADING || defined INDIRECT_THREADING
+#ifdef THREADING
     void *labels[] = {[0 ... ASCII - 1] = &&unsupported};
     for (char c = '0'; c <= '9'; c++)
         labels[c] = &&digit;
@@ -116,8 +121,8 @@ eof:
     labels['c'] = &&cons;
     labels['h'] = &&head;
     labels['t'] = &&tail;
-#endif
-#endif
+#endif /* BEFUNGE93PLUS */
+#endif /* THREADING */
 
 #ifdef DIRECT_THREADING
     void *program_as_labels[HEIGHT * WIDTH];
@@ -125,13 +130,16 @@ eof:
         for (int i = 0; i < WIDTH; i++)
             program_as_labels[j * WIDTH + i] = labels[program[j * WIDTH + i]];
     pc = program_as_labels;
-#endif
+#endif /* DIRECT_THREADING */
 
-    j = j = 0;
+    i = j = 0;
 
     srand(time(NULL));
 
     init_stack();
+#ifdef BEFUNGE93PLUS
+    init_heap();
+#endif /* BEFUNGE93PLUS */
 
     for (;;) {
         // goto **pc;
@@ -146,7 +154,7 @@ eof:
             NEXT()
         case '-':
         subtract : {
-            long temp = pop_value();
+            value_t temp = pop_value();
             push_value(pop_value() - temp);
             NEXT()
         }
@@ -156,8 +164,8 @@ eof:
             NEXT()
         case '/':
         divide : {
-            long temp1 = pop_value();
-            long temp2 = pop_value();
+            value_t temp1 = pop_value();
+            value_t temp2 = pop_value();
             if (temp1 == 0) {
                 printf("What do you want %ld/0 to be? ", temp1);
                 scanf("%ld", &temp1);
@@ -168,7 +176,7 @@ eof:
         }
         case '%':
         modulo : { // TODO: division by 0
-            long temp = pop_value();
+            value_t temp = pop_value();
             push_value(pop_value() % temp);
             NEXT()
         }
@@ -177,7 +185,7 @@ eof:
             NEXT()
         case '`':
         greater : {
-            long temp = pop_value();
+            value_t temp = pop_value();
             push_value(pop_value() > temp);
             NEXT()
         }
@@ -235,17 +243,17 @@ eof:
             NEXT()
         case ':':
         dup : {
-            long temp = pop_value();
-            push_value(temp);
-            push_value(temp);
+            struct value temp = pop();
+            push(temp);
+            push(temp);
             NEXT()
         }
         case '\\':
         swap : {
-            long temp1 = pop_value();
-            long temp2 = pop_value();
-            push_value(temp1);
-            push_value(temp2);
+            struct value temp1 = pop();
+            struct value temp2 = pop();
+            push(temp1);
+            push(temp2);
             NEXT()
         }
         case '$':
@@ -268,8 +276,8 @@ eof:
             NEXT()
         case 'g':
         get : {
-            long temp1 = pop_value();
-            long temp2 = pop_value();
+            value_t temp1 = pop_value();
+            value_t temp2 = pop_value();
             if (temp1 < 0 || temp1 >= HEIGHT || temp2 < 0 || temp2 >= WIDTH) {
                 fprintf(stderr, "g 'Get' instruction out of bounds (%ld,%ld)\n", temp2, temp1);
                 push_value(0);
@@ -279,8 +287,8 @@ eof:
         }
         case 'p':
         put : {
-            long temp1 = pop_value();
-            long temp2 = pop_value();
+            value_t temp1 = pop_value();
+            value_t temp2 = pop_value();
             if (temp1 < 0 || temp1 >= HEIGHT || temp2 < 0 || temp2 >= WIDTH) {
                 fprintf(stderr, "p 'Put' instruction out of bounds (%ld,%ld)\n", temp2, temp1);
                 pop_value();
@@ -288,13 +296,13 @@ eof:
                 program[temp1 * WIDTH + temp2] = pop_value();
 #ifdef DIRECT_THREADING
                 program_as_labels[temp1 * WIDTH + temp2] = labels[program[temp1 * WIDTH + temp2]];
-#endif
+#endif /* DIRECT_THREADING */
             }
             NEXT()
         }
         case '&':
         input_int : {
-            long temp = -1;
+            value_t temp = -1;
             scanf("%ld", &temp);
             push_value(temp);
             NEXT()
@@ -313,32 +321,24 @@ eof:
 #ifdef BEFUNGE93PLUS
         case 'c':
         cons : {
-            value_t temp = pop();
+            struct value temp = pop();
             push_heap_address(allocate(pop(), temp));
+            print_heap();
             NEXT()
         }
         case 'h':
         head:
-            push_heap_address(head(pop_heap_address()).value);
+            push(head(pop_heap_address()));
             NEXT()
         case 't':
         tail:
-            push_heap_address(tail(pop_heap_address()).value);
+            push(tail(pop_heap_address()));
             NEXT()
-#endif
+#endif /* BEFUNGE93PLUS */
         default:
         unsupported:
             fprintf(stderr, "Unsupported instruction '%c' (0x%02x) (maybe not Befunge-93?)\n", program[j * WIDTH + i], program[j * WIDTH + i]);
             NEXT()
         }
     }
-}
-
-/* Program */
-
-void next() {
-    int temp1 = j, temp2 = i;
-    i = (i + di + WIDTH) % WIDTH;
-    j = (j + dj + HEIGHT) % HEIGHT;
-    pc += (j - temp1) * WIDTH + (i - temp2);
 }
