@@ -15,10 +15,9 @@ int64_t freelist = 0;
 
 void sweep() {
     for (int i = 0; i < HEAP_SIZE; i++) {
-        if (heap[i].head.marked) {
-            heap[i].head.marked = false;
-            heap[i].tail.marked = false;
-        } else {
+        if (heap[i].head.marked)
+            heap[i].head.marked = heap[i].tail.marked = false;
+        else {
             heap[i].head.value = freelist;
             freelist = i;
         }

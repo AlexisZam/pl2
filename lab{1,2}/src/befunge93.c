@@ -127,8 +127,7 @@ eof:
     pc = program_as_labels;
 #endif
 
-    j = 0;
-    i = 0;
+    j = j = 0;
 
     srand(time(NULL));
 

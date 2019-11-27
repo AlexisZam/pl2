@@ -45,8 +45,13 @@ void free_stack() {
 
 void print_stack() {
 #ifdef PRINT_STACK
-    for (struct stack *s = stack; s; s = s->next)
+    for (struct stack *s = stack; s; s = s->next) {
+#ifdef BEFUNGE93PLUS
+        dprintf(STACK_FD, "%ld ", s->value.value);
+#else
         dprintf(STACK_FD, "%ld ", s->value);
+#endif
+    }
     dprintf(STACK_FD, "\n");
 #endif
 }
@@ -88,8 +93,13 @@ void free_stack() {
 
 void print_stack() {
 #ifdef PRINT_STACK
-    for (int i = stack.top - 1; i >= 0; i--)
+    for (int i = stack.top - 1; i >= 0; i--) {
+#ifdef BEFUNGE93PLUS
+        dprintf(STACK_FD, "%ld ", stack.values[i].value);
+#else
         dprintf(STACK_FD, "%ld ", stack.values[i]);
+#endif
+    }
     dprintf(STACK_FD, "\n");
 #endif
 }
@@ -124,8 +134,13 @@ void free_stack() {
 
 void print_stack() {
 #ifdef PRINT_STACK
-    for (int i = stack.top - 1; i >= 0; i--)
+    for (int i = stack.top - 1; i >= 0; i--) {
+#ifdef BEFUNGE93PLUS
+        dprintf(STACK_FD, "%ld ", stack.values[i].value);
+#else
         dprintf(STACK_FD, "%ld ", stack.values[i]);
+#endif
+    }
     dprintf(STACK_FD, "\n");
 #endif
 }
