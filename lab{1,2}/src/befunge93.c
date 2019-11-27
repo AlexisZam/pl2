@@ -315,7 +315,7 @@ eof:
         case 'c':
         cons : {
             long temp = pop_value();
-            push_heap_address(allocate(pop_value(), temp));
+            push_heap_address(allocate(pop(), temp));
             NEXT()
         }
         case 'h':

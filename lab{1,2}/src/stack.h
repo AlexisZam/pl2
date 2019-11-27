@@ -29,6 +29,7 @@ void init_stack();
 #ifdef BEFUNGE93PLUS
 void push_value(int64_t);
 void push_heap_address(int64_t);
+value_t pop();
 long pop_value();
 long pop_heap_address();
 #else

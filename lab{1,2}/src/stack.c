@@ -1,6 +1,6 @@
-#ifdef BEFUNGE93PLUS
+// #ifdef BEFUNGE93PLUS
 #include "heap.h"
-#endif
+// #endif
 #include "stack.h"
 #include <stdio.h>
 #include <stdlib.h>
@@ -157,21 +157,24 @@ void mark() {
 #endif
 
 void push_value(int64_t value) {
-    push((value_t){value});
+    push((value_t){value, INT64_T, true});
 }
 
 void push_heap_address(int64_t heap_address) {
     push((value_t){heap_address, HEAP_ADDRESS, false});
 }
 
-int64_t pop_value() { return pop().value; }
+int64_t pop_value() {
+    value_t v = pop();
+    if (v.type != INT64_T) // TODO: should we type check?
+        fprintf(stderr, "Type error");
+    return v.value;
+}
 
 int64_t pop_heap_address() {
     value_t v = pop();
-    if (v.type != HEAP_ADDRESS) { // TODO: should we type check?
+    if (v.type != HEAP_ADDRESS) // TODO: should we type check?
         fprintf(stderr, "Type error");
-        exit(-1);
-    }
     return v.value;
 }
 #else
