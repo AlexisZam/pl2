@@ -25,19 +25,27 @@
     break;
 #endif /* THREADING */
 
+/* Global variables */
+
 int i = 0, j = 0;
 int di = 1, dj = 0;
+#ifdef THREADING
 void **pc;
+#endif /* THREADING */
 
 #define HEIGHT 25
 #define WIDTH 80
 char program[] = {[0 ... HEIGHT * WIDTH - 1] = ' '};
 
 void next() {
+#ifdef THREADING
     int temp1 = j, temp2 = i;
+#endif /* THREADING */
     i = (i + di + WIDTH) % WIDTH;
     j = (j + dj + HEIGHT) % HEIGHT;
+#ifdef THREADING
     pc += (j - temp1) * WIDTH + (i - temp2);
+#endif /* THREADING */
 }
 
 void parse_program(const char *filename) {
@@ -146,47 +154,47 @@ int main(int argc, char *argv[]) {
         switch (program[j * WIDTH + i]) {
         case '0' ... '9':
         digit:
-            push_value(program[j * WIDTH + i] - '0');
+            push((struct value){program[j * WIDTH + i] - '0'});
             NEXT()
         case '+':
         add:
-            push_value(pop_value() + pop_value());
+            push((struct value){pop().value + pop().value});
             NEXT()
         case '-':
         subtract : {
-            value_t temp = pop_value();
-            push_value(pop_value() - temp);
+            long_t temp = pop().value;
+            push((struct value){pop().value - temp});
             NEXT()
         }
         case '*':
         multiply:
-            push_value(pop_value() * pop_value());
+            push((struct value){pop().value * pop().value});
             NEXT()
         case '/':
         divide : {
-            value_t temp1 = pop_value();
-            value_t temp2 = pop_value();
+            long_t temp1 = pop().value;
+            long_t temp2 = pop().value;
             if (temp1 == 0) {
                 printf("What do you want %ld/0 to be? ", temp1);
                 scanf("%ld", &temp1);
-                push_value(temp1);
+                push((struct value){temp1});
             } else
-                push_value(temp2 / temp1);
+                push((struct value){temp2 / temp1});
             NEXT()
         }
         case '%':
         modulo : { // TODO: division by 0
-            value_t temp = pop_value();
-            push_value(pop_value() % temp);
+            long_t temp = pop().value;
+            push((struct value){pop().value % temp});
             NEXT()
         }
         case '!':
-            not : push_value(!pop_value());
+            not : push((struct value){!pop().value});
             NEXT()
         case '`':
         greater : {
-            value_t temp = pop_value();
-            push_value(pop_value() > temp);
+            long_t temp = pop().value;
+            push((struct value){pop().value > temp});
             NEXT()
         }
         case '>':
@@ -223,12 +231,12 @@ int main(int argc, char *argv[]) {
             }
         case '_':
         horizontal_if:
-            if (pop_value())
+            if (pop().value)
                 goto left;
             goto right;
         case '|':
         vertical_if:
-            if (pop_value())
+            if (pop().value)
                 goto up;
             goto down;
         case '"':
@@ -238,7 +246,7 @@ int main(int argc, char *argv[]) {
                 print_stack();
                 if (program[j * WIDTH + i] == '"')
                     break;
-                push_value(program[j * WIDTH + i]);
+                push((struct value){program[j * WIDTH + i]});
             }
             NEXT()
         case ':':
@@ -258,16 +266,16 @@ int main(int argc, char *argv[]) {
         }
         case '$':
         pop:
-            pop_value();
+            pop();
             NEXT()
         case '.':
         output_int:
-            printf("%ld ", pop_value());
+            printf("%ld ", pop().value);
             fflush(stdout);
             NEXT()
         case ',':
         output_char:
-            printf("%c", (char)pop_value());
+            printf("%c", (char)pop().value);
             fflush(stdout);
             NEXT()
         case '#':
@@ -276,24 +284,24 @@ int main(int argc, char *argv[]) {
             NEXT()
         case 'g':
         get : {
-            value_t temp1 = pop_value();
-            value_t temp2 = pop_value();
+            long_t temp1 = pop().value;
+            long_t temp2 = pop().value;
             if (temp1 < 0 || temp1 >= HEIGHT || temp2 < 0 || temp2 >= WIDTH) {
                 fprintf(stderr, "g 'Get' instruction out of bounds (%ld,%ld)\n", temp2, temp1);
-                push_value(0);
+                push((struct value){0});
             } else
-                push_value(program[temp1 * WIDTH + temp2]);
+                push((struct value){program[temp1 * WIDTH + temp2]});
             NEXT()
         }
         case 'p':
         put : {
-            value_t temp1 = pop_value();
-            value_t temp2 = pop_value();
+            long_t temp1 = pop().value;
+            long_t temp2 = pop().value;
             if (temp1 < 0 || temp1 >= HEIGHT || temp2 < 0 || temp2 >= WIDTH) {
                 fprintf(stderr, "p 'Put' instruction out of bounds (%ld,%ld)\n", temp2, temp1);
-                pop_value();
+                pop();
             } else {
-                program[temp1 * WIDTH + temp2] = pop_value();
+                program[temp1 * WIDTH + temp2] = pop().value;
 #ifdef DIRECT_THREADING
                 program_as_labels[temp1 * WIDTH + temp2] = labels[program[temp1 * WIDTH + temp2]];
 #endif /* DIRECT_THREADING */
@@ -302,14 +310,14 @@ int main(int argc, char *argv[]) {
         }
         case '&':
         input_int : {
-            value_t temp = -1;
+            long_t temp = -1;
             scanf("%ld", &temp);
-            push_value(temp);
+            push((struct value){temp});
             NEXT()
         }
         case '~':
         input_char:
-            push_value(getchar());
+            push((struct value){getchar()});
             NEXT()
         case '@':
         end:
@@ -322,17 +330,17 @@ int main(int argc, char *argv[]) {
         case 'c':
         cons : {
             struct value temp = pop();
-            push_heap_address(allocate(pop(), temp));
+            push(allocate(pop(), temp));
             print_heap();
             NEXT()
         }
         case 'h':
         head:
-            push(head(pop_heap_address()));
+            push(head(pop()));
             NEXT()
         case 't':
         tail:
-            push(tail(pop_heap_address()));
+            push(tail(pop()));
             NEXT()
 #endif /* BEFUNGE93PLUS */
         default:

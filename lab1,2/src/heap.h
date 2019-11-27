@@ -1,10 +1,9 @@
 #pragma once
 
-#include "stack.h"
-#include <sys/types.h>
+#include "types.h"
 
 void init_heap();
 void print_heap();
-int allocate(struct value, struct value);
-struct value head(int);
-struct value tail(int);
+struct value allocate(struct value, struct value);
+struct value head(struct value);
+struct value tail(struct value);
