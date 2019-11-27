@@ -321,7 +321,6 @@ int main(int argc, char *argv[]) {
             NEXT()
         case '@':
         end:
-            free_stack();
             return 0;
         case ' ':
         nop:

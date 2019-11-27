@@ -5,7 +5,6 @@
 void init_stack();
 void push(struct value);
 struct value pop();
-void free_stack();
 void print_stack();
 
 #ifdef BEFUNGE93PLUS

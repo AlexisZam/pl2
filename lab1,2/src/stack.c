@@ -4,7 +4,7 @@
 
 int top = 0;
 #ifdef DYNAMIC_STACK
-int size = 0;
+int stack_size = 0;
 struct value *stack = NULL;
 #else
 #define STACK_SIZE 1024 * 1024
@@ -14,16 +14,16 @@ struct value stack[STACK_SIZE];
 void init_stack() {
 #ifdef DYNAMIC_STACK
 #define INIT_SIZE 1024
-    size = INIT_SIZE;
-    stack = malloc(size * sizeof(struct value));
+    stack_size = INIT_SIZE;
+    stack = malloc(stack_size * sizeof(struct value));
 #endif /* DYNAMIC_STACK */
 }
 
 void push(struct value value) {
 #ifdef DYNAMIC_STACK
-    if (top == size) {
-        size *= 2;
-        stack = realloc(stack, size * sizeof(struct value));
+    if (top == stack_size) {
+        stack_size *= 2;
+        stack = realloc(stack, stack_size * sizeof(struct value));
     }
 #else
     if (top == STACK_SIZE) {
@@ -38,15 +38,6 @@ struct value pop() {
     if (!top)
         return (struct value){0};
     return stack[--top];
-}
-
-void free_stack() {
-    top = 0;
-#ifdef DYNAMIC_STACK
-    size = 0;
-    free(stack);
-    stack = NULL;
-#endif /* DYNAMIC_STACK */
 }
 
 #define STACK_FD 3

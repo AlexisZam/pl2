@@ -10,29 +10,14 @@ struct cons_cell {
 /* Global variables */
 
 int freelist = 0;
-#define HEAP_SIZE 10
+#ifdef DYNAMIC_HEAP
+int heap_size = 0;
+struct value *stack = NULL;
+#else
+#define HEAP_SIZE 10 // TODO: fix heap_size
+const int heap_size = HEAP_SIZE;
 struct cons_cell heap[HEAP_SIZE];
-
-#define HEAP_FD 4
-void print_heap() {
-#ifdef PRINT_HEAP
-    int temp = freelist;
-    for (int i = 0; i < HEAP_SIZE; i++)
-        if (i == temp)
-            temp = heap[temp].head.value;
-        else
-            dprintf(HEAP_FD, "(%ld:%d,%ld:%d) ",
-                    heap[i].head.value, heap[i].head.type,
-                    heap[i].tail.value, heap[i].tail.type);
-    dprintf(HEAP_FD, "\n");
-    sleep(3);
-#endif /* PRINT_HEAP */
-}
-
-void init_heap() {
-    for (int i = 0; i < HEAP_SIZE; i++)
-        heap[i].head.value = i + 1;
-}
+#endif               /* DYNAMIC_HEAP */
 
 void sweep() {
     for (int i = HEAP_SIZE - 1; i >= 0; i--) {
@@ -48,19 +33,31 @@ void sweep() {
 void gc() {
     mark();
     sweep();
-    if (freelist == HEAP_SIZE - 1) {
+}
+
+void init_heap() {
 #ifdef DYNAMIC_HEAP
-        // TODO: realloc
-#else
-        fprintf(stderr, "Heap overflow\n");
-        exit(-1);
+#define INIT_SIZE
+    heap_size = INIT_SIZE;
+    stack = malloc(heap_size * sizeof(struct value));
 #endif /* DYNAMIC_HEAP */
-    }
+    for (int i = 0; i < heap_size; i++)
+        heap[i].head.value = i + 1;
 }
 
 struct value allocate(struct value head, struct value tail) {
-    if (freelist == HEAP_SIZE - 1)
+    if (freelist == heap_size - 1) {
         gc();
+        if (freelist == heap_size - 1) {
+#ifdef DYNAMIC_HEAP
+            heap_size *= 2;
+            stack = realloc(stack, heap_size * sizeof(struct cons_cell));
+#else
+            fprintf(stderr, "Heap overflow\n");
+            exit(-1);
+#endif /* DYNAMIC_HEAP */
+        }
+    }
     struct value address = {freelist, HEAP_ADDRESS, false};
     freelist = heap[freelist].head.value;
     heap[freelist] = (struct cons_cell){head, tail};
@@ -73,6 +70,22 @@ struct value head(struct value address) {
 
 struct value tail(struct value address) {
     return heap[address.value].tail;
+}
+
+#define HEAP_FD 4
+void print_heap() {
+#ifdef PRINT_HEAP
+    int temp = freelist;
+    for (int i = 0; i < HEAP_SIZE; i++)
+        if (i == temp)
+            temp = heap[temp].head.value;
+        else
+            dprintf(HEAP_FD, "(%ld:%d,%ld:%d) ",
+                    heap[i].head.value, heap[i].head.type,
+                    heap[i].tail.value, heap[i].tail.type);
+    dprintf(HEAP_FD, "\n");
+    sleep(3);
+#endif /* PRINT_HEAP */
 }
 
 // TODO: copying
