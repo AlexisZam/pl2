@@ -7,10 +7,7 @@
 typedef int64_t long_t;
 struct value {
     int64_t value : 62;
-    enum {
-        INT64_T,
-        HEAP_ADDRESS
-    } type : 1;
+    bool pointer : 1;
     bool marked : 1;
 };
 #else

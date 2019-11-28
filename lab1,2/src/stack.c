@@ -43,38 +43,31 @@ struct value pop() {
 #define STACK_FD 3
 void print_stack() {
 #ifdef PRINT_STACK
-    for (int i = top - 1; i >= 0; i--)
+    dprintf(STACK_FD, "(((%d))) ", top);
+    for (int i = top - 1; i >= 0; i--) {
+#ifdef BEFUNGE93PLUS
+        if (stack[i].marked)
+            dprintf(STACK_FD, "\033[1;31m");
+        dprintf(STACK_FD, "%ld:%d ",
+                stack[i].value, stack[i].pointer);
+        dprintf(STACK_FD, "\033[0m");
+#else
         dprintf(STACK_FD, "%ld ", stack[i].value);
+#endif /* BEFUNGE93PLUS */
+    }
     dprintf(STACK_FD, "\n");
 #endif /* PRINT_STACK */
 }
 
-#ifdef BEFUNGE93PLUS
-
-void DFS(struct value value) { // TODO: improve DFS
-    if (value.type == HEAP_ADDRESS && !value.marked) {
-        value.marked = true;
-        DFS(head(value));
-        DFS(tail(value));
-    }
-}
-
-void mark() {
-    for (int i = top - 1; i >= 0; i--)
-        if (stack[i].type == HEAP_ADDRESS)
-            DFS(stack[i]);
-}
-
-void push_value(long_t value) {
-    push((struct value){value});
-}
-
 // TODO: stack used as adresses are implicitly cast, and conversely
 // TODO: should we type check?
-long_t pop_value() { return pop().value; }
 
-#else
-
-void push_value(long_t value) { push((struct value){value}); }
-
+#ifdef BEFUNGE93PLUS
+void mark() {
+    for (int i = 0; i < top; i++)
+        if (stack[i].pointer)
+            DFS(&stack[i]);
+    // print_heap();
+    // print_stack();
+}
 #endif /* BEFUNGE93PLUS */

@@ -335,11 +335,11 @@ int main(int argc, char *argv[]) {
         }
         case 'h':
         head:
-            push(head(pop()));
+            push(*head(pop()));
             NEXT()
         case 't':
         tail:
-            push(tail(pop()));
+            push(*tail(pop()));
             NEXT()
 #endif /* BEFUNGE93PLUS */
         default:
