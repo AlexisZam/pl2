@@ -1,5 +1,5 @@
 CC = gcc
-CFLAGS = -g#-O3 -Wall -Wextra -Wno-char-subscripts -Wno-unused-result -Wno-missing-field-initializers -Wno-unused-label -Wno-format# -Wpedantic
+CFLAGS = -g -Wall -Wextra -Wno-char-subscripts -Wno-unused-result -Wno-missing-field-initializers -Wno-unused-label -Wno-format# -Wpedantic
 CFLAGS += -D THREADING
 CFLAGS += -D DIRECT_THREADING
 CFLAGS += -D DYNAMIC_STACK

@@ -67,7 +67,7 @@ void mark() {
     for (int i = 0; i < top; i++)
         if (stack[i].pointer)
             DFS(&stack[i]);
-    // print_heap();
-    // print_stack();
+    print_heap();
+    print_stack();
 }
 #endif /* BEFUNGE93PLUS */

@@ -12,7 +12,7 @@ struct cons_cell {
 int freelist = 0;
 #ifdef DYNAMIC_HEAP
 int heap_size = 0;
-struct value *stack = NULL;
+struct cons_cell *heap = NULL;
 #else
 #define HEAP_SIZE 1024 * 1024 // TODO: fix heap_size
 const int heap_size = HEAP_SIZE;
@@ -49,7 +49,7 @@ void init_heap() {
 #ifdef DYNAMIC_HEAP
 #define INIT_SIZE 1024
     heap_size = INIT_SIZE;
-    stack = malloc(heap_size * sizeof(struct value));
+    heap = malloc(heap_size * sizeof(struct value));
 #endif /* DYNAMIC_HEAP */
     for (int i = 0; i < heap_size; i++)
         heap[i].head.value = i + 1;
@@ -60,28 +60,30 @@ struct value allocate(struct value head, struct value tail) {
         push(head);
         push(tail);
         gc();
+        pop();
+        pop();
         if (freelist == heap_size) {
 #ifdef DYNAMIC_HEAP
             heap_size *= 2;
-            stack = realloc(stack, heap_size * sizeof(struct cons_cell));
+            heap = realloc(heap, heap_size * sizeof(struct cons_cell));
 #else
             fprintf(stderr, "Heap overflow\n");
             exit(-1);
 #endif /* DYNAMIC_HEAP */
         }
     }
-    heap[freelist] = (struct cons_cell){head, tail};
-    struct value address = {freelist, true, false};
+    int temp = freelist;
     freelist = heap[freelist].head.value;
-    return address;
+    heap[temp] = (struct cons_cell){head, tail};
+    return (struct value){temp, true, false};
 }
 
-struct value *head(struct value address) {
-    return &heap[address.value].head;
+struct value head(struct value address) {
+    return heap[address.value].head;
 }
 
-struct value *tail(struct value address) {
-    return &heap[address.value].tail;
+struct value tail(struct value address) {
+    return heap[address.value].tail;
 }
 
 #define HEAP_FD 4
