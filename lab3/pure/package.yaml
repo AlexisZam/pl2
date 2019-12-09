@@ -1,0 +1,9 @@
+name: pure
+dependencies:
+  - base >= 4.7 && < 5
+  - containers
+
+executables:
+  pure-exe:
+    main: Main.hs
+    source-dirs: app

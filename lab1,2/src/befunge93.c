@@ -5,6 +5,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <time.h>
+#include <unistd.h>
 
 #ifdef THREADING
 #ifdef DIRECT_THREADING
@@ -52,7 +53,7 @@ void parse_program(const char *filename) {
     FILE *stream = fopen(filename, "r");
     if (!stream) {
         fprintf(stderr, "Error: couldn't open '%s' for input.\n", filename);
-        exit(-1);
+        exit(EXIT_FAILURE);
     }
     for (;;) {
         int c = fgetc(stream);
@@ -86,12 +87,37 @@ eof:
 }
 
 int main(int argc, char *argv[]) {
-    if (argc != 2) {
-        fprintf(stderr, "Usage: ./befunge93 foo.bf\n");
-        return -1;
+    int c;
+    extern char *optarg;
+    extern int optind;
+
+#ifdef BEFUNGE93PLUS
+    const char *optstring = "s:h:";
+#else
+    const char *optstring = "s:";
+#endif /* BEFUNGE93PLUS */
+    while ((c = getopt(argc, argv, optstring)) != -1)
+        switch (c) {
+        case 's':
+            fopen(optarg, "w");
+            break;
+#ifdef BEFUNGE93PLUS
+        case 'h':
+            fopen(optarg, "w");
+            break;
+#endif /* BEFUNGE93PLUS */
+        case '?':
+            exit(EXIT_FAILURE);
+        default:
+            exit(EXIT_FAILURE);
+        }
+
+    if (argc < 2) {
+        fprintf(stderr, "Usage: %s [-s stack] [-h heap] foo.bf\n", argv[0]);
+        exit(EXIT_FAILURE);
     }
 
-    parse_program(argv[1]);
+    parse_program(argv[optind]);
 
 #define ASCII 128
 #ifdef THREADING
@@ -172,20 +198,26 @@ int main(int argc, char *argv[]) {
             NEXT()
         case '/':
         divide : {
-            long_t temp1 = pop().value;
-            long_t temp2 = pop().value;
-            if (temp1 == 0) {
-                printf("What do you want %ld/0 to be? ", temp1);
-                scanf("%ld", &temp1);
-                push((struct value){temp1});
+            long_t temp = pop().value;
+            if (temp == 0) {
+                pop();
+                printf("What do you want %ld/0 to be? ", temp);
+                scanf("%ld", &temp);
+                push((struct value){temp});
             } else
-                push((struct value){temp2 / temp1});
+                push((struct value){pop().value / temp});
             NEXT()
         }
         case '%':
-        modulo : { // TODO: division by 0
+        modulo : {
             long_t temp = pop().value;
-            push((struct value){pop().value % temp});
+            if (temp == 0) {
+                pop();
+                printf("What do you want %ld/0 to be? ", temp);
+                scanf("%ld", &temp);
+                push((struct value){temp});
+            } else
+                push((struct value){pop().value % temp});
             NEXT()
         }
         case '!':
@@ -321,7 +353,7 @@ int main(int argc, char *argv[]) {
             NEXT()
         case '@':
         end:
-            return 0;
+            exit(EXIT_SUCCESS);
         case ' ':
         nop:
             NEXT()

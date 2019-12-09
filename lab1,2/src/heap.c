@@ -14,17 +14,16 @@ int freelist = 0;
 int heap_size = 0;
 struct cons_cell *heap = NULL;
 #else
-#define HEAP_SIZE 1024 * 1024 // TODO: fix heap_size
 const int heap_size = HEAP_SIZE;
 struct cons_cell heap[HEAP_SIZE];
-#endif                        /* DYNAMIC_HEAP */
+#endif /* DYNAMIC_HEAP */
 
-void DFS(struct value *value) { // TODO: improve DFS
-    if (!value->marked) {
-        value->marked = true;
-        if (value->pointer) {
-            DFS(&heap[value->value].head);
-            DFS(&heap[value->value].tail);
+void DFS(struct value *x) { // TODO: improve DFS
+    if (!x->marked) {
+        x->marked = true;
+        if (x->pointer) {
+            DFS(&heap[x->value].head);
+            DFS(&heap[x->value].tail);
         }
     }
 }
@@ -47,19 +46,19 @@ void gc() {
 
 void init_heap() {
 #ifdef DYNAMIC_HEAP
-#define INIT_SIZE 1024
-    heap_size = INIT_SIZE;
+    heap_size = INIT_HEAP_SIZE;
     heap = malloc(heap_size * sizeof(struct value));
 #endif /* DYNAMIC_HEAP */
     for (int i = 0; i < heap_size; i++)
         heap[i].head.value = i + 1;
 }
 
-struct value allocate(struct value head, struct value tail) {
+extern inline struct value allocate(struct value head, struct value tail) {
     if (freelist == heap_size) {
         push(head);
         push(tail);
         gc();
+        // printf("GC\n");
         pop();
         pop();
         if (freelist == heap_size) {
@@ -68,7 +67,7 @@ struct value allocate(struct value head, struct value tail) {
             heap = realloc(heap, heap_size * sizeof(struct cons_cell));
 #else
             fprintf(stderr, "Heap overflow\n");
-            exit(-1);
+            exit(EXIT_FAILURE);
 #endif /* DYNAMIC_HEAP */
         }
     }
@@ -78,23 +77,22 @@ struct value allocate(struct value head, struct value tail) {
     return (struct value){temp, true, false};
 }
 
-struct value head(struct value address) {
+extern inline struct value head(struct value address) {
     return heap[address.value].head;
 }
 
-struct value tail(struct value address) {
+extern inline struct value tail(struct value address) {
     return heap[address.value].tail;
 }
 
-#define HEAP_FD 4
 void print_heap() {
 #ifdef PRINT_HEAP
     int temp = freelist;
     dprintf(HEAP_FD, "(((%d))) ", temp);
     for (int i = 0; i < heap_size; i++)
         if (i == temp) {
+            dprintf(HEAP_FD, "(((%d))) ", temp);
             temp = heap[temp].head.value;
-            // dprintf(HEAP_FD, "(((%d))) ", temp);
         } else {
             if (heap[i].head.marked || heap[i].tail.marked)
                 dprintf(HEAP_FD, "\033[1;31m");

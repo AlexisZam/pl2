@@ -1,11 +1,13 @@
 CC = gcc
-CFLAGS = -g -Wall -Wextra -Wno-char-subscripts -Wno-unused-result -Wno-missing-field-initializers -Wno-unused-label -Wno-format# -Wpedantic
+CFLAGS = -O3 -Wall -Wextra -Wno-char-subscripts -Wno-unused-result -Wno-missing-field-initializers -Wno-unused-label -Wno-format# -Wpedantic
 CFLAGS += -D THREADING
 CFLAGS += -D DIRECT_THREADING
-CFLAGS += -D DYNAMIC_STACK
-CFLAGS +=# -D PRINT_STACK
-CFLAGS +=# -D DYNAMIC_HEAP
-CFLAGS +=# -D PRINT_HEAP
+CFLAGS += -D STACK_SIZE=1024*1024
+CFLAGS +=# -D DYNAMIC_STACK -D INIT_STACK_SIZE=1024
+CFLAGS +=# -D PRINT_STACK -D STACK_FD=3
+CFLAGS += -D HEAP_SIZE=16*1024*1024
+CFLAGS +=# -D DYNAMIC_HEAP -D INIT_HEAP_SIZE=1024
+CFLAGS += #-D PRINT_HEAP -D HEAP_FD=4
 CFLAGS +=# -D COPYING
 
 .PHONY:	all clean

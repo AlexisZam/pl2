@@ -6,7 +6,7 @@
 #ifdef BEFUNGE93PLUS
 typedef int64_t long_t;
 struct value {
-    int64_t value : 62;
+    long_t value : 62;
     bool pointer : 1;
     bool marked : 1;
 };
