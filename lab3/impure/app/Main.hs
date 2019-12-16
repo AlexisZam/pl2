@@ -7,17 +7,15 @@ import Control.Monad
 import Data.Array.Base
 import Data.Array.IO
 -- import Data.List
-import System.IO
+-- import System.IO
 
 main :: IO ()
 main = do
     -- parse input
     line <- getLine
-    let [n, m] = (map read $ words line) :: [Int]
+    let m = (read $ last $ words line) :: Int
     contents <- getContents
     let queries = (map (map read) $ map words $ lines contents) :: [[Int]]
-
-    -- let sumMod xs = foldl' (\x y -> (x + y) `mod` m) 0 xs
 
     -- create and fill answer array
     let max' = maximum $ map last queries
@@ -30,22 +28,18 @@ main = do
             e1 <- unsafeRead a i
             e2 <- unsafeRead a streak
             unsafeWrite a i ((e1 + e2) `mod` m)
+        
+        -- let sumMod xs = foldl' (\x y -> (x + y) `mod` m) 0 xs
         -- es <- mapM (readArray a) streaks'
         -- writeArray a i $ sum es `mod` m
 
-    -- a' <- mapArray (\e -> e * 2 `mod` m) a
-    -- unsafeWrite a 0 1
-    forM_ [1..max'] $ \i -> unsafeRead a i >>= (\e -> unsafeWrite a i (e * 2 `mod` m))
-
-
-    -- build running sums array
     forM_ [1..max'] $ \i -> do
         e1 <- unsafeRead a (i - 1)
         e2 <- unsafeRead a i
-        unsafeWrite a i ((e1 + e2) `mod` m)
+        unsafeWrite a i ((e1 + (e2 * 2 `mod` m)) `mod` m)
 
     -- answer queries
-    hSetBuffering stdout (BlockBuffering (Just n))
+    -- hSetBuffering stdout (BlockBuffering (Just n))
     forM_ queries $ \[i, j] -> case i of
         0 -> unsafeRead a j >>= print
         _ -> do
