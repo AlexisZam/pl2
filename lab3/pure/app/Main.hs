@@ -4,17 +4,16 @@
 {-# OPTIONS_GHC -threaded -rtsopts -with-rtsopts=-N #-}
 {-# LANGUAGE BangPatterns #-}
 
-import qualified Data.IntMap.Strict as IntMap -- HashMap
-import Data.Array.IArray
-import Data.Array.Unboxed
-import Data.List (foldl1', scanl1)
+-- import Data.Array.IArray
+-- import Data.Array.Unboxed
+-- import Data.List (foldl1', scanl1)
 
 main :: IO ()
 main = do
     line <- getLine
-    let m = (read $ last $ words line) :: Int
+    let !m = (read $ last $ words line) :: Int
     contents <- getContents
-    let queries = (map (map read) $ map words $ lines contents) :: [[Int]]
+    let !queries = (map (map read) $ map words $ lines contents) :: [[Int]]
 
     mapM_ print $ answer m queries
 
@@ -25,15 +24,17 @@ answer m queries = map answer' queries
         streaks = takeWhile (<= max') $ map (subtract 1) $ iterate (* 2) 2
 
         arr :: Array Int Int
-        arr = array (0, max') ((0, 1) : [(i, foo i) | i <- [1..max']])
+        arr = listArray (0, max') $ 1 : [aux i | i <- [1..max']]
 
-        foo i = sumMod $ map (arr !) streaks'
-            where
-                streaks' = map (i -) $ filter (<= i) streaks
-                sumMod = foldl1' (\x y -> (x + y) `mod` m)
+        aux i = foldl1' (\x y -> (x + y) `mod` m) $ map (arr !) $ map (i -) $ filter (<= i) streaks
 
-        arr' :: UArray Int Int
-        arr' = listArray (0, max') $ 1 : (tail $ scanl1 (\x y -> ((x + (y * 2 `mod` m)) `mod` m)) (elems arr))
+        -- arr' :: UArray Int Int
+        -- arr' = listArray (0, max') $ 1 : (tail $ scanl1 (\x y -> (x + (y * 2 `mod` m)) `mod` m) $ elems arr)
+
+        arr' :: Array Int Int
+        arr' = listArray (0, max') $ 1 : [aux' i | i <- [1..max']]
+
+        aux' i = (arr' ! (i - 1) + (arr ! i * 2 `mod` m)) `mod` m
 
         answer' [0, b] = arr' ! b
         answer' [a, b] = (arr' ! b - arr' ! (a - 1)) `mod` m
