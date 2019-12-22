@@ -4,7 +4,7 @@ BEF_DIR=~/opt/Befunge-93
 
 make
 
-for test in $(ls $BEF_DIR/eg/*.bf test/*.bf)
+for test in $(ls testsuites/*.bf) # $BEF_DIR/eg/*.bf 
 do
     echo $(basename $test)
     $BEF_DIR/bin/bef -s bef.stack $test > bef.out 2> bef.err
