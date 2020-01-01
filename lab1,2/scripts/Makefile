@@ -14,11 +14,11 @@ CFLAGS +=# -D COPYING
 
 all: befunge93 befunge93+
 
-befunge93: src/befunge93.c src/stack.c
-	$(CC) $(CFLAGS) -o bin/befunge93 src/befunge93.c src/stack.c
+befunge93: ../src/befunge93.c ../src/stack.c
+	$(CC) $(CFLAGS) -o ../bin/befunge93 ../src/befunge93.c ../src/stack.c
 
-befunge93+: src/befunge93.c src/stack.c src/heap.c
-	$(CC) $(CFLAGS) -D BEFUNGE93PLUS -o bin/befunge93+ src/befunge93.c src/stack.c src/heap.c
+befunge93+: ../src/befunge93.c ../src/stack.c ../src/heap.c
+	$(CC) $(CFLAGS) -D BEFUNGE93PLUS -o ../bin/befunge93+ ../src/befunge93.c ../src/stack.c ../src/heap.c
 
 clean:
-	$(RM) bin/befunge93 bin/befunge93+
+	$(RM) ../bin/befunge93 ../bin/befunge93+
