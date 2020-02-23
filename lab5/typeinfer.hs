@@ -6,22 +6,8 @@ import Control.Monad.State
 import qualified Data.Map.Strict as Map
 import Text.Read (Lexeme(..), lexP, readPrec, (<++))
 
-data Type = Tvar Int | Tfun Type Type
-  deriving Eq
-data Expr = Evar String | Eabs String Expr | Eapp Expr Expr
-  deriving (Eq, Ord)
-
--- Pretty printing of expressions
-
-always :: Bool
-always = True -- False omimgu parentheses whenever possible
-
-instance Show Expr where
-  showsPrec _ (Evar x) = (x ++)
-  showsPrec p (Eabs x e) =
-    showParen (always || p > 0) ((("\\" ++ x ++ ". ") ++) . showsPrec 0 e)
-  showsPrec p (Eapp e1 e2) =
-    showParen (always || p > 1) (showsPrec 1 e1 . (" " ++) . showsPrec 2 e2)
+data Type = Tvar Int | Tfun Type Type deriving Eq
+data Expr = Evar String | Eabs String Expr | Eapp Expr Expr deriving (Eq, Ord)
 
 -- Parsing of expressions
 
