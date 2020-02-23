@@ -1,9 +1,0 @@
-name: pure
-dependencies:
-  - base >= 4.7 && < 5
-  - array
-
-executables:
-  pure-exe:
-    main: Main.hs
-    source-dirs: app

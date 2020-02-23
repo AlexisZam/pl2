@@ -4,24 +4,24 @@
 {-# OPTIONS_GHC -threaded -rtsopts -with-rtsopts=-N #-}
 {-# LANGUAGE BangPatterns #-}
 
--- import Data.Array.IArray
--- import Data.Array.Unboxed
--- import Data.List (foldl1', scanl1)
+import Data.Array.IArray
+import Data.Array.Unboxed
+import Data.List (foldl1', scanl1)
 
 main :: IO ()
 main = do
     line <- getLine
-    let !m = (read $ last $ words line) :: Int
+    let m = (read $ last $ words line) :: Int
     contents <- getContents
-    let !queries = (map (map read) $ map words $ lines contents) :: [[Int]]
+    let queries = (map (map read) $ map words $ lines contents) :: [[Int]]
 
     mapM_ print $ answer m queries
 
 answer :: Int -> [[Int]] -> [Int]
 answer m queries = map answer' queries
     where
-        max' = maximum $ map last queries
-        streaks = takeWhile (<= max') $ map (subtract 1) $ iterate (* 2) 2
+        max' = maximum $! map last queries
+        streaks = takeWhile (<= max') $! map (subtract 1) $! iterate (* 2) 2
 
         arr :: Array Int Int
         arr = listArray (0, max') $ 1 : [aux i | i <- [1..max']]
@@ -34,7 +34,7 @@ answer m queries = map answer' queries
         arr' :: Array Int Int
         arr' = listArray (0, max') $ 1 : [aux' i | i <- [1..max']]
 
-        aux' i = (arr' ! (i - 1) + (arr ! i * 2 `mod` m)) `mod` m
+        aux' i = (arr' ! (i - 1) + (aux i * 2 `mod` m)) `mod` m
 
         answer' [0, b] = arr' ! b
         answer' [a, b] = (arr' ! b - arr' ! (a - 1)) `mod` m

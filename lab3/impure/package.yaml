@@ -1,9 +1,0 @@
-name: impure
-dependencies:
-  - base >= 4.7 && < 5
-  - array
-
-executables:
-  impure-exe:
-    main: Main.hs
-    source-dirs: app
