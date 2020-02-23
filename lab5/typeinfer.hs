@@ -51,7 +51,7 @@ infer e = evalState (go Map.empty e) 0
           i <- get
           let alpha = Tvar i
           let gamma' = Map.insert (Evar x) alpha gamma
-          modify (+ 1)
+          modify' (+ 1)
           (tau, c) <- go gamma' e'
           return (Tfun alpha tau, c)
         go gamma (Eapp e1 e2) = do
@@ -59,7 +59,7 @@ infer e = evalState (go Map.empty e) 0
           (tau, c2) <- go gamma e2
           i <- get
           let alpha = Tvar i
-          modify (+ 1)
+          modify' (+ 1)
           return (alpha, (Sub sigma (Tfun tau alpha)) : c1 ++ c2)
 
 unify :: [Sub] -> Maybe [Sub]
