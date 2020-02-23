@@ -17,7 +17,7 @@ void init_stack() {
 #endif /* DYNAMIC_STACK */
 }
 
-extern inline void push(struct value value) {
+void push(struct value value) {
 #ifdef DYNAMIC_STACK
     if (top == stack_size) {
         stack_size *= 2;
@@ -32,7 +32,7 @@ extern inline void push(struct value value) {
     stack[top++] = value;
 }
 
-extern inline struct value pop() {
+struct value pop() {
     if (!top)
         return (struct value){0};
     return stack[--top];

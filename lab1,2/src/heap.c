@@ -53,7 +53,7 @@ void init_heap() {
         heap[i].head.value = i + 1;
 }
 
-extern inline struct value allocate(struct value head, struct value tail) {
+struct value allocate(struct value head, struct value tail) {
     if (freelist == heap_size) {
         push(head);
         push(tail);
@@ -77,11 +77,11 @@ extern inline struct value allocate(struct value head, struct value tail) {
     return (struct value){temp, true, false};
 }
 
-extern inline struct value head(struct value address) {
+struct value head(struct value address) {
     return heap[address.value].head;
 }
 
-extern inline struct value tail(struct value address) {
+struct value tail(struct value address) {
     return heap[address.value].tail;
 }
 

@@ -3,8 +3,8 @@
 #include "types.h"
 
 void init_stack();
-void push(struct value);
-struct value pop();
+static inline void push(struct value);
+static inline struct value pop();
 void print_stack();
 
 #ifdef BEFUNGE93PLUS
