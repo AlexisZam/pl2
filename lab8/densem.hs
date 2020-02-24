@@ -87,7 +87,7 @@ instance Show V where
 
 -- Parsing
 
-next :: [t] -> [(t, [t])]
+next :: [a] -> [(a, [a])]
 next (x : r) = [(x, r)]
 next _ = []
 
