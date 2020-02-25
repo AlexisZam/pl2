@@ -10,38 +10,28 @@
 
 <body>
   <h1>Count combinations in modular arithmetic!</h1>
-  <p>In how many ways can we choose <span class="emph">K</span> elements out
-    of a set of <span class="emph">N</span> elements, if their order is not
-    important? Obviously, the answer is <span class="emph">C(N, K)</span>,
-    in other words,
-    a <a href="https://en.wikipedia.org/wiki/Binomial_coefficient">binomial
-      coefficient</a>.
-  </p>
-  <p>This number may be very large and, for this reason, we want to calculate
-    the remainder (modulo) of its division by a large prime number
-    <span class="emph">P</span>.
+  <p>In how many ways can we choose <span class="emph">K</span> elements out of a set of <span class="emph">N</span>
+    elements, if their order is not important? Obviously, the answer is <span class="emph">C(N, K)</span>, in other
+    words, a <a href="https://en.wikipedia.org/wiki/Binomial_coefficient">binomial coefficient</a>.</p>
+  <p>This number may be very large and, for this reason, we want to calculate the remainder (modulo) of its division by
+    a large prime number <span class="emph">P</span>.
     <p>
-      <p>Assume that <span class="emph">0 ≤ K ≤ N < P ≤ 10<sup>9</sup></span>
-        and that <span class="emph">P</span> is a prime number.</p>
+      <p>Assume that <span class="emph">0 ≤ K ≤ N < P ≤ 10<sup>9</sup></span> and that <span class="emph">P</span> is a
+        prime number.</p>
       <blockquote>
         <p>For example, if <span class="emph">N = 42</span>,
           <span class="emph">K = 17</span> and
           <span class="emph">P = 690419</span>,
           the result is <span class="emph">188587</span>.
         </p>
-        <p>In fact, <span class="emph">C(42, 17) = 254661927156 =
-            368851 × 690419 + 188587</span>.
-        </p>
+        <p>In fact, <span class="emph">C(42, 17) = 254661927156 = 368851 × 690419 + 188587</span>.</p>
       </blockquote>
 
       <hr />
 
       <p><span class="question">Question 1</span>
-        <p>What is the value of
-          <span class="emph">C(<span id="N">4</span>,
-            <span id="K">0</span>) modulo
-            <span id="P">5</span></span>?
-        </p>
+        <p>What is the value of <span class="emph">C(<span id="N">4</span>, <span id="K">0</span>) modulo <span
+              id="P">5</span></span>?</p>
 
         <form action="/pl2/2019b/exercises/combmod.php" id="f" name="f" method="post">
           <table border="0" cellspacing="3">
