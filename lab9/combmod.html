@@ -1,0 +1,56 @@
+<!DOCTYPE html
+  PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+  <title>Count combinations in modular arithmetic!</title>
+  <link rel="stylesheet" type="text/css" href="combmod.css" />
+</head>
+
+<body>
+  <h1>Count combinations in modular arithmetic!</h1>
+  <p>In how many ways can we choose <span class="emph">K</span> elements out
+    of a set of <span class="emph">N</span> elements, if their order is not
+    important? Obviously, the answer is <span class="emph">C(N, K)</span>,
+    in other words,
+    a <a href="https://en.wikipedia.org/wiki/Binomial_coefficient">binomial
+      coefficient</a>.
+  </p>
+  <p>This number may be very large and, for this reason, we want to calculate
+    the remainder (modulo) of its division by a large prime number
+    <span class="emph">P</span>.
+    <p>
+      <p>Assume that <span class="emph">0 ≤ K ≤ N < P ≤ 10<sup>9</sup></span>
+        and that <span class="emph">P</span> is a prime number.</p>
+      <blockquote>
+        <p>For example, if <span class="emph">N = 42</span>,
+          <span class="emph">K = 17</span> and
+          <span class="emph">P = 690419</span>,
+          the result is <span class="emph">188587</span>.
+        </p>
+        <p>In fact, <span class="emph">C(42, 17) = 254661927156 =
+            368851 × 690419 + 188587</span>.
+        </p>
+      </blockquote>
+
+      <hr />
+
+      <p><span class="question">Question 1</span>
+        <p>What is the value of
+          <span class="emph">C(<span id="N">4</span>,
+            <span id="K">0</span>) modulo
+            <span id="P">5</span></span>?
+        </p>
+
+        <form action="/pl2/2019b/exercises/combmod.php" id="f" name="f" method="post">
+          <table border="0" cellspacing="3">
+            <tr>
+              <td><input type="text" class="box" name="answer" id="answer" autofocus /></td>
+              <td><input type="submit" class="button" name="submit" id="submit" value="Submit!" /></td>
+            </tr>
+          </table>
+        </form>
+</body>
+
+</html>
