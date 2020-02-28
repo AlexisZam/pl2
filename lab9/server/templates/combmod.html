@@ -5,7 +5,7 @@
 <head>
   <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
   <title>Count combinations in modular arithmetic!</title>
-  <link rel="stylesheet" type="text/css" href="combmod.css" />
+  <link rel="stylesheet" type="text/css" href={{ url_for('static', filename='combmod.css') }} />
 </head>
 
 <body>
@@ -29,11 +29,13 @@
 
       <hr />
 
-      <p><span class="question">Question 1</span>
-        <p>What is the value of <span class="emph">C(<span id="N">4</span>, <span id="K">0</span>) modulo <span
-              id="P">5</span></span>?</p>
+      <p><span class="question">Question {{ session["i"] }}</span>
+        <p>What is the value of <span class="emph">C(<span id="N">{{ session["N"] }}</span>, <span
+              id="K">{{ session["K"] }}</span>) modulo
+            <span id="P">{{ session["P"] }}</span></span>?</p>
 
-        <form action="/pl2/2019b/exercises/combmod.php" id="f" name="f" method="post">
+        {% if answer %}
+        <form action="/" id="f" name="f" method="post">
           <table border="0" cellspacing="3">
             <tr>
               <td><input type="text" class="box" name="answer" id="answer" autofocus /></td>
@@ -41,6 +43,25 @@
             </tr>
           </table>
         </form>
+        {% else %}
+        {% if session["right"] %}
+        <p class="right">Right! :-)</p>
+        {% else %}
+        <p class="wrong">Wrong! Try again... :-(</p>
+        {% endif %}
+        {% if congratulations %}
+        <p><span class="congratulations">Congratulations!</span>
+          You answered all questions!</p>
+        <p>It took you {{ session["time"] }} seconds and you made {{ session["mistakes"] }} mistakes.</p>
+        <form action="/" id="r" name="r" method="post">
+          <input class="button" type="submit" name="again" id="again" value="Play again!" autofocus="">
+        </form>
+        {% else %}
+        <form action="/" id="r" name="r" method="post">
+          <input class="button" type="submit" name="again" id="again" value="Continue!" autofocus />
+        </form>
+        {% endif %}
+        {% endif %}
 </body>
 
 </html>

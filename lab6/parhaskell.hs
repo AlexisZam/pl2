@@ -4,16 +4,14 @@
 
 import Control.Monad.Par
 
--- main :: IO [()]
+main :: IO [()]
 main = do
   line <- getLine
   let t = read line :: Int
   sequence $ take t $ repeat $ do
     line' <- getLine
     let [n, k, p] = map read $ words line' :: [Int]
-    -- return (n, k, p)
-    print $ choosePar p n k
-  -- print $ runPar $  p n k
+    print $ choose'' p n k
 
 -- Pascal's triangle
 
