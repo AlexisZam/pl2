@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python3.8
 
 from bs4 import BeautifulSoup
 from requests import Session
@@ -8,7 +8,7 @@ from sys import argv
 
 def choose_mod(N, K, P):
     return check_output(
-        "../../lab6/parhaskell", input=f"1\n {N} {K} {P}\n", universal_newlines=True
+        "../../lab6/parhaskell", input=f"1\n {N} {K} {P}\n", text=True
     ).strip()
 
 
@@ -25,7 +25,7 @@ s = Session()
 
 for i in range(n_iter):
     r = s.get(url)
-    soup = BeautifulSoup(markup=r.text, features="lxml")
+    soup = BeautifulSoup(markup=r.text)
     N = int(soup.find(attrs={"id": "N"}).text)
     K = int(soup.find(attrs={"id": "K"}).text)
     P = int(soup.find(attrs={"id": "P"}).text)
@@ -35,6 +35,6 @@ for i in range(n_iter):
     print(f"Answer: {answer}")
 
     r = s.post(url, data={"answer": answer})
-    soup = BeautifulSoup(markup=r.text, features="lxml")
+    soup = BeautifulSoup(markup=r.text)
     right = soup.find(attrs={"class": "right"}).text
     print(right)

@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python3.8
 
 from flask import Flask, render_template, request, session
 from gmpy2 import is_prime
@@ -10,7 +10,7 @@ from time import time
 
 def choose_mod(N, K, P):
     return check_output(
-        "../../lab6/parhaskell", input=f"1\n {N} {K} {P}\n", universal_newlines=True
+        "../../lab6/parhaskell", input=f"1\n {N} {K} {P}\n", text=True
     ).strip()
 
 
