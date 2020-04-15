@@ -1,40 +1,58 @@
 #!/usr/bin/env python3.8
 
+from argparse import ArgumentParser
+from subprocess import run
+
 from bs4 import BeautifulSoup
 from requests import Session
-from subprocess import check_output
-from sys import argv
 
 
 def choose_mod(N, K, P):
-    return check_output(
-        "../../lab6/parhaskell", input=f"1\n {N} {K} {P}\n", text=True
-    ).strip()
+    return run(
+        "../../lab6/parhaskell",
+        input=f"1\n {N} {K} {P}\n",
+        capture_output=True,
+        text=True,
+    ).stdout.strip()
 
 
-n_iter = 10
+parser = ArgumentParser(add_help=False)
+parser.add_argument(
+    "url",
+    nargs="?",
+    default="https://courses.softlab.ntua.gr/pl2/2019b/exercises/combmod.php",
+    type=str,
+)
+args = parser.parse_args()
 
-try:
-    url = argv[1]
-except:
-    print(f"Usage: {argv[0]} url")
-    exit(1)
+session = Session()
 
-
-s = Session()
-
-for i in range(n_iter):
-    r = s.get(url)
-    soup = BeautifulSoup(markup=r.text)
-    N = int(soup.find(attrs={"id": "N"}).text)
-    K = int(soup.find(attrs={"id": "K"}).text)
-    P = int(soup.find(attrs={"id": "P"}).text)
-    print(f"Round {i + 1}, C({N}, {K}) modulo {P}")
+i = 1
+while True:
+    response = session.get(args.url)
+    soup = BeautifulSoup(markup=response.text, features="lxml")
+    N = int(soup.find(id="N").text)
+    K = int(soup.find(id="K").text)
+    P = int(soup.find(id="P").text)
+    print(f"Round {i}, C({N}, {K}) modulo {P}")
 
     answer = choose_mod(N, K, P)
     print(f"Answer: {answer}")
 
-    r = s.post(url, data={"answer": answer})
-    soup = BeautifulSoup(markup=r.text)
-    right = soup.find(attrs={"class": "right"}).text
-    print(right)
+    response = session.post(args.url, data={"answer": answer})
+    soup = BeautifulSoup(markup=response.text, features="lxml")
+    right = soup.find(attrs={"class": "right"})
+    if right:
+        print(right.text)
+    else:
+        wrong = soup.find(attrs={"class": "wrong"}).text
+        print(wrong)
+        session.post(args.url)
+        continue
+
+    congratulations = soup.find(attrs={"class": "congratulations"})
+    if congratulations:
+        print(congratulations.text)
+        break
+
+    i += 1

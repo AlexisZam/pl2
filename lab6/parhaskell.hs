@@ -2,8 +2,6 @@
 {-# OPTIONS_GHC -O2 #-}
 {-# OPTIONS_GHC -threaded -rtsopts -with-rtsopts=-N #-}
 
-import Control.Monad.Par
-
 main :: IO [()]
 main = do
   line <- getLine
@@ -42,8 +40,8 @@ invMod p x = expMod p x (p - 2)
 
 chooseMod' :: Int -> Int -> Int -> Int
 chooseMod' p n k = let num = prodMod p [n - k + 1 .. n]
-                    den = factMod p k
-                in num * invMod p den `mod` p
+                       den = factMod p k
+                   in num * invMod p den `mod` p
 
 -- Lucas's theorem (and Fermat's little theorem)
 
@@ -54,19 +52,19 @@ digitize p = go
 
 chooseMod'' :: Int -> Int -> Int -> Int
 chooseMod'' p n k = let ns = digitize p n
-                     ks = digitize p k
-                 in prodMod p (zipWith (chooseMod' p) ns ks)
+                        ks = digitize p k
+                    in prodMod p (zipWith (chooseMod' p) ns ks)
 
-chooseModPar :: Int -> Int -> Int -> Int
-chooseModPar p n k = let ns = digitize p n
-                      ks = digitize p k
-                  in runPar $ do
-                    i <- new
-                    j <- new
-                    let (ns1, ns2) = splitAt (length ns `div` 2) ns
-                    let (ks1, ks2) = splitAt (length ks `div` 2) ks
-                    fork (put i (prodMod p (zipWith (chooseMod' p) ns1 ks1)))
-                    fork (put j (prodMod p (zipWith (chooseMod' p) ns2 ks2)))
-                    a <- get i
-                    b <- get j
-                    return (a * b `mod` p)
+-- chooseModPar :: Int -> Int -> Int -> Int
+-- chooseModPar p n k = let ns = digitize p n
+--                          ks = digitize p k
+--                      in runPar $ do
+--                        i <- new
+--                        j <- new
+--                        let (ns1, ns2) = splitAt (length ns `div` 2) ns
+--                        let (ks1, ks2) = splitAt (length ks `div` 2) ks
+--                        fork (put i (prodMod p (zipWith (chooseMod' p) ns1 ks1)))
+--                        fork (put j (prodMod p (zipWith (chooseMod' p) ns2 ks2)))
+--                        a <- get i
+--                        b <- get j
+--                        return (a * b `mod` p)
