@@ -36,7 +36,7 @@ while True:
         print(right.text)
     else:
         wrong = soup.find(attrs={"class": "wrong"}).text
-        print(wrong.text)
+        print(wrong)
         session.post(args.url)
         continue
 
