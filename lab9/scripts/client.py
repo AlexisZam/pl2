@@ -1,20 +1,11 @@
 #!/usr/bin/env python3.8
 
 from argparse import ArgumentParser
-from subprocess import run
 
 from bs4 import BeautifulSoup
 from requests import Session
 
-
-def choose_mod(N, K, P):
-    return run(
-        "../../lab6/parhaskell",
-        input=f"1\n {N} {K} {P}\n",
-        capture_output=True,
-        text=True,
-    ).stdout.strip()
-
+from utils import choose_mod
 
 parser = ArgumentParser(add_help=False)
 parser.add_argument(

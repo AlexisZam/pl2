@@ -3,20 +3,12 @@
 from math import log2
 from os import urandom
 from random import randint
-from subprocess import run
 from time import time
 
 from flask import Flask, render_template, request, session
 from sympy import randprime
 
-
-def choose_mod(N, K, P):
-    return run(
-        "../../lab6/parhaskell",
-        input=f"1\n {N} {K} {P}\n",
-        capture_output=True,
-        text=True,
-    ).stdout.strip()
+from utils import choose_mod
 
 
 def foo():
