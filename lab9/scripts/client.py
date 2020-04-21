@@ -12,7 +12,6 @@ parser.add_argument(
     "url",
     nargs="?",
     default="https://courses.softlab.ntua.gr/pl2/2019b/exercises/combmod.php",
-    type=str,
 )
 args = parser.parse_args()
 
@@ -37,7 +36,7 @@ while True:
         print(right.text)
     else:
         wrong = soup.find(attrs={"class": "wrong"}).text
-        print(wrong)
+        print(wrong.text)
         session.post(args.url)
         continue
 
