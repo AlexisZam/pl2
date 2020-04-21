@@ -87,10 +87,8 @@ instance Show P where
   showsPrec _ Ppop = ("pop" ++)
   showsPrec _ Pswap = ("swap" ++)
   showsPrec _ Pswap2 = ("swap2" ++)
-  showsPrec d (Pseq p1 p2) =
-    showParen (d > 0) $ showsPrec 1 p1 . (" " ++) . shows p2
-  showsPrec _ (Pcond p1 p2) =
-    ("cond [" ++) . shows p1 . (" | " ++) . shows p2 . ("]" ++)
+  showsPrec d (Pseq p1 p2) = showParen (d > 0) $ showsPrec 1 p1 . (" " ++) . shows p2
+  showsPrec _ (Pcond p1 p2) = ("cond [" ++) . shows p1 . (" | " ++) . shows p2 . ("]" ++)
   showsPrec _ (Ploop p) = ("loop [" ++) . shows p . ("]" ++)
 
 instance Show V where
