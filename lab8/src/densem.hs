@@ -1,5 +1,4 @@
-{-# OPTIONS_GHC -O2 #-}
-{-# OPTIONS_GHC -Wall -fwarn-tabs -fwarn-incomplete-record-updates -fwarn-monomorphism-restriction -fwarn-unused-do-bind #-}
+{-# OPTIONS_GHC -O2 -Weverything -Wno-implicit-prelude -Wno-safe #-}
 
 import Control.Monad.Fix (fix)
 
@@ -97,10 +96,6 @@ instance Show V where
   showsPrec _ (VB False) = ("false" ++)
 
 -- Parsing
-
-next :: [t] -> [(t, [t])]
-next (x : r) = [(x, r)]
-next _ = []
 
 instance Read P where
   readsPrec d s =
