@@ -1,4 +1,5 @@
-{-# OPTIONS_GHC -O2 -Weverything -Wno-implicit-prelude -Wno-safe #-}
+{-# LANGUAGE Safe #-}
+{-# OPTIONS_GHC -O2 -Weverything -Wno-implicit-prelude -Wno-all-missed-specialisations #-}
 
 import Control.Monad.Fix (fix)
 
