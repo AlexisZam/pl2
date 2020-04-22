@@ -1,14 +1,14 @@
 {-# LANGUAGE Safe #-}
 {-# OPTIONS_GHC -O2 -Weverything -Wno-implicit-prelude -Wno-missing-deriving-strategies -Wno-prepositive-qualified-module #-}
 
-import Control.Monad.State (State, evalState, get, put, replicateM)
+import Control.Monad.State (State, evalState, get, put, replicateM_)
 import Data.List (foldl')
 import qualified Data.Map.Strict as Map
 import Text.Read ((<++), Lexeme (Ident, Punc, Symbol), lexP, readPrec)
 
 data Type = Tvar Int | Tfun Type Type deriving (Eq)
 
-data Expr = Evar String | Eabs String Expr | Eapp Expr Expr deriving (Eq, Ord)
+data Expr = Evar String | Eabs String Expr | Eapp Expr Expr deriving (Eq)
 
 -- Parsing of expressions
 
@@ -38,24 +38,24 @@ instance Read Expr where
 -- Pretty printing of types
 
 instance Show Type where
-  showsPrec _ (Tvar a) = ("@" ++) . shows a
-  showsPrec p (Tfun t1 t2) =
-    showParen (p > 0) (showsPrec 1 t1 . (" -> " ++) . shows t2)
+  showsPrec _ (Tvar alpha) = ("@" ++) . shows alpha
+  showsPrec p (Tfun sigma tau) =
+    showParen (p > 0) (showsPrec 1 sigma . (" -> " ++) . shows tau)
 
 -- Type inference
 
 data Sub = Sub Type Type
 
-type Env = Map.Map Expr Type
+type Env = Map.Map String Type
 
 constraints :: Expr -> (Type, [Sub])
 constraints e = evalState (go Map.empty e) 0
   where
     go :: Env -> Expr -> State Int (Type, [Sub])
-    go env x@(Evar _) = return (env Map.! x, [])
+    go env (Evar x) = return (env Map.! x, [])
     go env (Eabs x e') = do
       a <- fresh
-      (t, c) <- go (Map.insert (Evar x) a env) e'
+      (t, c) <- go (Map.insert x a env) e'
       return (Tfun a t, c)
     go env (Eapp e1 e2) = do
       (t1, c1) <- go env e1
@@ -83,6 +83,7 @@ notElem' a@(Tvar _) = go
   where
     go a'@(Tvar _) = a /= a'
     go (Tfun t1 t2) = go t1 && go t2
+notElem' _ = undefined
 
 substitute :: Sub -> Type -> Type
 substitute (Sub a@(Tvar _) t) = go
@@ -127,7 +128,7 @@ readOne = do
   let e = read s :: Expr
   maybe (putStrLn "type error") print (inferType e)
 
-main :: IO [()]
+main :: IO ()
 main = do
   n <- readLn
-  replicateM n readOne
+  replicateM_ n readOne
