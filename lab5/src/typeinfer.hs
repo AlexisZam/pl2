@@ -1,7 +1,7 @@
 {-# LANGUAGE Safe #-}
 {-# OPTIONS_GHC -O2 -Weverything -Wno-implicit-prelude -Wno-missing-deriving-strategies -Wno-prepositive-qualified-module #-}
 
-import Control.Monad.State (State, evalState, get, modify', put, replicateM)
+import Control.Monad.State (State, evalState, get, put, replicateM)
 import Data.List (foldl')
 import qualified Data.Map.Strict as Map
 import Text.Read ((<++), Lexeme (Ident, Punc, Symbol), lexP, readPrec)
@@ -48,58 +48,56 @@ data Sub = Sub Type Type
 
 type Env = Map.Map Expr Type
 
-infer :: Expr -> (Type, [Sub])
-infer e = evalState (go Map.empty e) 0
+constraints :: Expr -> (Type, [Sub])
+constraints e = evalState (go Map.empty e) 0
   where
     go :: Env -> Expr -> State Int (Type, [Sub])
     go env x@(Evar _) = return (env Map.! x, [])
     go env (Eabs x e') = do
-      i <- get
-      modify' (+ 1)
-      let a = Tvar i
+      a <- fresh
       (t, c) <- go (Map.insert (Evar x) a env) e'
       return (Tfun a t, c)
     go env (Eapp e1 e2) = do
       (t1, c1) <- go env e1
       (t2, c2) <- go env e2
-      i <- get
-      let a = Tvar i
-      modify' (+ 1)
+      a <- fresh
       return (a, Sub t1 (Tfun t2 a) : c1 ++ c2)
 
-unify :: [Sub] -> Maybe [Sub]
-unify = go []
-  where
-    go mgu [] = Just mgu
-    go mgu (Sub t1 t2 : subs)
-      | t1 == t2 = go mgu subs
-    go mgu (sub@(Sub a@(Tvar _) t2) : subs)
-      | not (contains a t2) = go (sub : mgu) (replace sub subs)
-    go mgu (Sub t1 a@(Tvar _) : subs) =
-      go mgu (Sub a t1 : subs)
-    go mgu (Sub (Tfun t1 t2) (Tfun t1' t2') : subs) =
-      go mgu (Sub t1 t1' : Sub t2 t2' : subs)
-    go _ _ = Nothing
+fresh :: State Int Type
+fresh = do
+  i <- get
+  put (i + 1)
+  return (Tvar i)
 
-contains :: Type -> Type -> Bool
-contains a = go
-  where
-    go a'@(Tvar _) = a == a'
-    go (Tfun t1 t2) = go t1 || go t2
+mgu :: [Sub] -> Maybe [Sub]
+mgu [] = Just []
+mgu (Sub t1 t2 : subs) | t1 == t2 = mgu subs
+mgu (sub@(Sub a@(Tvar _) t) : subs)
+  | a `notElem'` t = (sub :) <$> mgu (map (substitute' sub) subs)
+mgu (Sub t a@(Tvar _) : subs) = mgu (Sub a t : subs)
+mgu (Sub (Tfun t1 t2) (Tfun t1' t2') : subs) = mgu (Sub t1 t1' : Sub t2 t2' : subs)
+mgu _ = Nothing
 
-replace :: Sub -> [Sub] -> [Sub]
-replace sub = map (\(Sub x y) -> Sub (substitute sub x) (substitute sub y))
+notElem' :: Type -> Type -> Bool
+notElem' a@(Tvar _) = go
+  where
+    go a'@(Tvar _) = a /= a'
+    go (Tfun t1 t2) = go t1 && go t2
 
 substitute :: Sub -> Type -> Type
-substitute (Sub a t) = go
+substitute (Sub a@(Tvar _) t) = go
   where
     go a'@(Tvar _) = if a == a' then t else a'
     go (Tfun t1 t2) = Tfun (go t1) (go t2)
+substitute _ = undefined
 
-properSubstitute :: [Sub] -> Type -> Type
-properSubstitute subs t =
-  let t' = foldl' (flip substitute) t subs
-   in if t == t' then t else properSubstitute subs t'
+substitute' :: Sub -> Sub -> Sub
+substitute' sub (Sub t1 t2) = Sub (substitute sub t1) (substitute sub t2)
+
+substitute'' :: [Sub] -> Type -> Type
+substitute'' subs t = if t == t' then t else substitute'' subs t'
+  where
+    t' = foldl' (flip substitute) t subs
 
 enumerate :: Type -> Type
 enumerate t = evalState (go t) (0, Map.empty)
@@ -107,15 +105,19 @@ enumerate t = evalState (go t) (0, Map.empty)
     go :: Type -> State (Int, Map.Map Int Int) Type
     go (Tvar a) = do
       (i, m) <- get
-      case Map.lookup a m of
-        Just a' -> return (Tvar a')
-        Nothing -> do
-          put (i + 1, Map.insert a i m)
-          return (Tvar i)
+      maybe
+        (put (i + 1, Map.insert a i m) >> return (Tvar i))
+        (return . Tvar)
+        (Map.lookup a m)
     go (Tfun t1 t2) = do
       t1' <- go t1
       t2' <- go t2
       return (Tfun t1' t2')
+
+inferType :: Expr -> Maybe Type
+inferType e = do
+  let (t, subs) = constraints e
+  enumerate . flip substitute'' t <$> mgu subs
 
 -- Main program
 
@@ -123,10 +125,7 @@ readOne :: IO ()
 readOne = do
   s <- getLine
   let e = read s :: Expr
-  let (t, subs) = infer e
-  case unify subs of
-    Just mgu -> print $ enumerate $ properSubstitute mgu t
-    Nothing -> putStrLn "type error"
+  maybe (putStrLn "type error") print (inferType e)
 
 main :: IO [()]
 main = do
