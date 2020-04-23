@@ -1,42 +1,46 @@
-{-# OPTIONS_GHC -O2 -Weverything -Wno-implicit-prelude -Wno-all-missed-specialisations -Wno-missing-safe-haskell-mode -Wno-unsafe #-}
+{-# LANGUAGE BangPatterns #-}
+-- {-# OPTIONS_GHC -O2 -Weverything -Wno-implicit-prelude -Wno-all-missed-specialisations -Wno-missing-safe-haskell-mode -Wno-unsafe #-}
+{-# OPTIONS_GHC -O2 #-}
 
-import Control.Monad (forM_)
-import Data.Array.IO (IOUArray, newArray, readArray, writeArray)
+import Control.Monad (forM_, replicateM_)
+import Control.Monad.ST (ST)
+import Data.Array.ST (STUArray, newArray_, readArray, runSTUArray, writeArray)
+import Data.Array.Unboxed ((!), UArray)
+import qualified Data.ByteString.Char8 as B
+import Data.Maybe (fromJust)
 
 main :: IO ()
 main = do
-  line <- getLine
-  let m = (read $ last $ words line) :: Int
-  contents <- getContents
-  let queries = map (map read . words) (lines contents) :: [[Int]]
+  line <- B.getLine
+  let [n, m] = (map (fst . fromJust . B.readInt) . B.words) line
 
-  let max' = maximum $ map last queries
-  let streaks = takeWhile (<= max') $ map (subtract 1) $ iterate (* 2) 2
+  let a = solve m
 
-  a <- newArray_ (0, max') 0 :: IO (IOUArray Int Int)
+  replicateM_ n $ do
+    line <- B.getLine
+    let q = (map (fst . fromJust . B.readInt) . B.words) line
+    print $ answer a m q
+
+solve :: Int -> UArray Int Int
+solve m = runSTUArray $ do
+  let maxB = 1000000
+  let streaks = takeWhile (<= maxB) $ map (subtract 1) $ iterate (* 2) 2
+  a <- newArray_ (0, maxB) :: ST s (STUArray s Int Int)
+
   writeArray a 0 1
-  forM_ [1 .. max'] (foo a m streaks)
-  forM_ [1 .. max'] (foo' a m)
-  forM_ queries (bar a m)
+  forM_ [1 .. maxB] $ \i ->
+    forM_ (filter (<= i) streaks) $ \streak -> do
+      current <- readArray a i
+      streak' <- readArray a (i - streak)
+      writeArray a i ((current + streak') `mod` m)
 
-foo :: IOUArray Int Int -> Int -> [Int] -> Int -> IO ()
-foo a m streaks i = do
-  let streaks' = map (i -) $ filter (<= i) streaks
-  forM_ streaks' $ \streak -> do
-    e1 <- readArray a i
-    e2 <- readArray a streak
-    writeArray a i $ (e1 + e2) `mod` m
+  forM_ [1 .. maxB] $ \i -> do
+    previous <- readArray a (i - 1)
+    current <- readArray a i
+    writeArray a i ((previous + current * 2 `mod` m) `mod` m)
+  return a
 
-foo' :: IOUArray Int Int -> Int -> Int -> IO ()
-foo' a m i = do
-  e1 <- readArray a (i - 1)
-  e2 <- readArray a i
-  writeArray a i $ (e1 + (e2 * 2 `mod` m)) `mod` m
-
-bar :: IOUArray Int Int -> Int -> [Int] -> IO ()
-bar a _ [0, j] = readArray a j >>= print
-bar a m [i, j] = do
-  e1 <- readArray a (i - 1)
-  e2 <- readArray a j
-  print $ (e2 - e1) `mod` m
-bar _ _ _ = undefined
+answer :: UArray Int Int -> Int -> [Int] -> Int
+answer a _ [0, j] = a ! j
+answer a m [i, j] = (a ! j - a ! (i - 1)) `mod` m
+answer _ _ _ = undefined
