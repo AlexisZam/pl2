@@ -1,32 +1,39 @@
 {-# LANGUAGE Safe #-}
-{-# OPTIONS_GHC -O2 -Weverything -Wno-implicit-prelude -Wno-all-missed-specialisations #-}
+{-# OPTIONS_GHC -O2 -Weverything -Wno-implicit-prelude -Wno-incomplete-uni-patterns -Wno-prepositive-qualified-module #-}
 
-import Data.Array.IArray ((!), Array, listArray)
+import Control.Monad (replicateM_)
+import Data.Array.IArray ((!), Array, elems, listArray)
+import Data.Array.Unboxed (UArray)
+import qualified Data.ByteString.Char8 as C
 import Data.List (foldl1')
+import Data.Maybe (fromJust)
+
+max' :: Int
+max' = 1000000
+
+streaks :: [Int]
+streaks = takeWhile (<= max') $ map (subtract 1) $ iterate (* 2) 2
+
+sumMod :: Int -> Int -> Int -> Int
+sumMod m x y = (x + y) `mod` m
+
+solve :: Int -> UArray Int Int
+solve m = listArray (0, max') $ scanl1 (sumMod m) $ elems array
+  where
+    array = listArray (0, max') (1 : [go i | i <- [1 .. max']]) :: Array Int Int
+    go i = foldl1' (sumMod m) $ map ((array !) . (i -)) $ takeWhile (<= i) streaks
+
+answer :: UArray Int Int -> Int -> Int -> Int -> Int
+answer a m i j = case i of
+  0 -> (2 * a ! j - 1) `mod` m
+  _ -> 2 * (a ! j - a ! (i - 1)) `mod` m
 
 main :: IO ()
 main = do
-  line <- getLine
-  let m = (read $ last $ words line) :: Int
-  contents <- getContents
-  let queries = map (map read . words) (lines contents) :: [[Int]]
-
-  mapM_ print $ answer m queries
-
-answer :: Int -> [[Int]] -> [Int]
-answer m queries = map answer' queries
-  where
-    max' = maximum $! map last queries
-    streaks = takeWhile (<= max') $! map (subtract 1) $! iterate (* 2) 2
-    arr :: Array Int Int
-    arr = listArray (0, max') $ 1 : [aux i | i <- [1 .. max']]
-    aux i = foldl1' (\x y -> (x + y) `mod` m) $ map ((arr !) . (i -)) $ filter (<= i) streaks
-    -- arr' :: UArray Int Int
-    -- arr' = listArray (0, max') $ 1 : (tail $ scanl1 (\x y -> (x + (y * 2 `mod` m)) `mod` m) $ elems arr)
-
-    arr' :: Array Int Int
-    arr' = listArray (0, max') $ 1 : [aux' i | i <- [1 .. max']]
-    aux' i = (arr' ! (i - 1) + (aux i * 2 `mod` m)) `mod` m
-    answer' [0, b] = arr' ! b
-    answer' [a, b] = (arr' ! b - arr' ! (a - 1)) `mod` m
-    answer' _ = undefined
+  line <- C.getLine
+  let [n, m] = map (fst . fromJust . C.readInt) $ C.words line
+  let a = solve m
+  replicateM_ n $ do
+    line' <- C.getLine
+    let [i, j] = map (fst . fromJust . C.readInt) $ C.words line'
+    print $ answer a m i j
