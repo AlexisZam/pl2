@@ -1,4 +1,4 @@
-{-# OPTIONS_GHC -O2 -Weverything -Wno-implicit-prelude -Wno-incomplete-uni-patterns -Wno-unsafe -Wno-unused-top-binds #-}
+{-# OPTIONS_GHC -O2 -Weverything -Wno-implicit-prelude -Wno-incomplete-uni-patterns -Wno-unsafe #-}
 
 import Control.DeepSeq (NFData)
 import Control.Monad.Par (runPar)
@@ -38,37 +38,26 @@ chooseMod p n k = go (min k (n - k))
   where
     go k' = prodMod' p [n - k' + 1 .. n] * invMod p (factMod p k') `mod` p
 
--- Lucas's theorem (and Fermat's little theorem)
-
-digits :: Word -> Word -> [Word]
-digits p = go
-  where
-    go 0 = []
-    go n = let (d, m) = divMod n p in m : go d
-
-chooseMod' :: Word -> Word -> Word -> Word
-chooseMod' p n k = go (min k (n - k))
-  where
-    go k' = prodMod' p (zipWith (chooseMod p) (digits p n) (digits p k'))
-
--- parallel
+-- Parallel
 
 mapParallel :: NFData b => (a -> b) -> [a] -> [b]
 mapParallel = Control.Parallel.Strategies.parMap rdeepseq
 
--- monad-par
-
 mapMonadPar :: NFData b => (a -> b) -> [a] -> [b]
 mapMonadPar f = runPar . Control.Monad.Par.Combinator.parMap f
 
+enviroment :: NFData b => IO ((a -> b) -> [a] -> [b])
+enviroment = do
+  package <- lookupEnv "PACKAGE"
+  return $ case fromMaybe "parallel" package of
+    "parallel" -> mapParallel
+    "monad-par" -> mapMonadPar
+    _ -> undefined
+
 main :: IO ()
 main = do
-  package <- lookupEnv "PACKAGE"
-  let map' = case fromMaybe "monad-par" package of
-        "parallel" -> mapParallel
-        "monad-par" -> mapMonadPar
-  print package
+  map' <- enviroment
   line <- C.getLine
   let t = fst $ fromJust $ C.readInt line
   contents <- C.getContents
-  mapM_ print $ map' ((\[n, k, p] -> chooseMod' p n k) . (map (fromIntegral . fst . fromJust . C.readInt) . C.words)) $ take t $ C.lines contents
+  mapM_ print $ map' ((\[n, k, p] -> chooseMod p n k) . (map (fromIntegral . fst . fromJust . C.readInt) . C.words)) $ take t $ C.lines contents
