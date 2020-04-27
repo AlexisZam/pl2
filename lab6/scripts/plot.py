@@ -30,6 +30,8 @@ data["Speedup"] = (
     .values
 )
 
+data.to_csv(join(dirname(__file__), f"../tables/table.csv"), index=False)
+
 for y in ["Time", "Speedup"]:
     fg = sns.relplot(
         x="N",
@@ -37,13 +39,14 @@ for y in ["Time", "Speedup"]:
         hue="T",
         data=data,
         col="Package",
+        col_wrap=2,
         legend="full",
         kind="line",
         marker="o",
     )
-    # for ax in fg.axes:
-    #     ax.set_xscale("log", basex=2)
-    #     ax.set_yscale("log", basey=2)
+    for ax in fg.axes:
+        ax.set_xscale("log", basex=2)
+        ax.set_yscale("log", basey=2)
     fg.savefig(
         join(dirname(__file__), f"../plots/{y.lower()}.pdf"), bbox_inches="tight"
     )

@@ -1,12 +1,11 @@
 {-# OPTIONS_GHC -O2 -Weverything -Wno-implicit-prelude -Wno-incomplete-uni-patterns -Wno-unsafe #-}
 
 import Control.DeepSeq (NFData)
-import Control.Monad.Par (runPar)
+import Control.Monad.Par (get, runPar, spawnP)
 import Control.Monad.Par.Combinator (parMap)
-import Control.Parallel.Strategies (parMap, rdeepseq)
-import qualified Data.ByteString.Char8 as C
+import Control.Parallel.Strategies (parMap, parTuple2, rdeepseq, using)
 import Data.List (foldl')
-import Data.Maybe (fromJust, fromMaybe)
+import Data.Maybe (fromMaybe)
 import System.Environment (lookupEnv)
 
 -- Fermat's little theorem
@@ -20,44 +19,83 @@ expMod p b e = go (b `mod` p) e `mod` p
       | odd e' = b' * go b' (e' - 1) `mod` p
       | otherwise = go (b' * b' `mod` p) (e' `div` 2)
 
+invMod :: Word -> Word -> Word
+invMod p n = expMod p n (p - 2)
+
+-- helper functions
+
 prodMod :: Word -> Word -> Word -> Word
 prodMod p n1 n2 = (n1 * n2) `mod` p
 {-# INLINE prodMod #-}
 
-prodMod' :: Word -> [Word] -> Word
-prodMod' p = foldl' (prodMod p) 1
+prodMod' :: Word -> Word -> Word -> Word
+prodMod' p from to = foldl' (prodMod p) 1 [from .. to]
 
-factMod :: Word -> Word -> Word
-factMod p n = prodMod' p [1 .. n]
+-- monad-par
 
-invMod :: Word -> Word -> Word
-invMod p n = expMod p n (p - 2)
+parTuple2' :: (NFData a, NFData b) => (a, b) -> (a, b)
+parTuple2' (n1, n2) = runPar $ do
+  n1' <- spawnP n1
+  n2' <- spawnP n2
+  n1'' <- get n1'
+  n2'' <- get n2'
+  return (n1'', n2'')
 
-chooseMod :: Word -> Word -> Word -> Word
-chooseMod p n k = go (min k (n - k))
+prodModMonadPar :: Word -> Word -> Word -> Word
+prodModMonadPar p = go 8
   where
-    go k' = prodMod' p [n - k' + 1 .. n] * invMod p (factMod p k') `mod` p
+    go :: Int -> Word -> Word -> Word
+    go 0 from to = prodMod' p from to
+    go n from to =
+      let half = (from + to) `div` 2
+       in uncurry (*) (parTuple2' (go (n - 1) from (half - 1), go (n - 1) half to)) `mod` p
 
--- Parallel
-
-mapParallel :: NFData b => (a -> b) -> [a] -> [b]
-mapParallel = Control.Parallel.Strategies.parMap rdeepseq
+chooseModMonadPar :: Word -> Word -> Word -> Word
+chooseModMonadPar p n k = go (min k (n - k))
+  where
+    go k' = uncurry (*) (parTuple2' (prodModMonadPar p (n - k' + 1) n, invMod p (prodModMonadPar p 1 k'))) `mod` p
 
 mapMonadPar :: NFData b => (a -> b) -> [a] -> [b]
 mapMonadPar f = runPar . Control.Monad.Par.Combinator.parMap f
 
-enviroment :: NFData b => IO ((a -> b) -> [a] -> [b])
+-- parallel
+
+prodModParallel :: Word -> Word -> Word -> Word
+prodModParallel p = go 8
+  where
+    go :: Int -> Word -> Word -> Word
+    go 0 from to = prodMod' p from to
+    go n from to =
+      let half = (from + to) `div` 2
+       in uncurry (*) ((go (n - 1) from (half - 1), go (n - 1) half to) `using` parTuple2 rdeepseq rdeepseq) `mod` p
+
+chooseModParallel :: Word -> Word -> Word -> Word
+chooseModParallel p n k = go (min k (n - k))
+  where
+    go k' = uncurry (*) ((prodModParallel p (n - k' + 1) n, invMod p (prodModParallel p 1 k')) `using` parTuple2 rdeepseq rdeepseq) `mod` p
+
+mapParallel :: NFData b => (a -> b) -> [a] -> [b]
+mapParallel = Control.Parallel.Strategies.parMap rdeepseq
+
+-- main
+
+enviroment :: NFData b => IO (Word -> Word -> Word -> Word, (a -> b) -> [a] -> [b])
 enviroment = do
   package <- lookupEnv "PACKAGE"
   return $ case fromMaybe "parallel" package of
-    "parallel" -> mapParallel
-    "monad-par" -> mapMonadPar
+    "parallel" -> (chooseModParallel, mapParallel)
+    "monad-par" -> (chooseModMonadPar, mapMonadPar)
     _ -> undefined
 
 main :: IO ()
 main = do
-  map' <- enviroment
-  line <- C.getLine
-  let t = fst $ fromJust $ C.readInt line
-  contents <- C.getContents
-  mapM_ print $ map' ((\[n, k, p] -> chooseMod p n k) . (map (fromIntegral . fst . fromJust . C.readInt) . C.words)) $ take t $ C.lines contents
+  (chooseMod', map') <- enviroment
+  line <- getLine
+  let t = read line :: Int
+  contents <- getContents
+  mapM_ print $ map' ((\[n, k, p] -> chooseMod' p n k) . map read . words) $ take t $ lines contents
+
+chooseMod :: Word -> Word -> Word -> Word
+chooseMod p n k = go (min k (n - k))
+  where
+    go k' = prodMod' p (n - k' + 1) n * invMod p (prodMod' p 1 k') `mod` p
