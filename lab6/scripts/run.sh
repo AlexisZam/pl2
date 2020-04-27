@@ -6,7 +6,7 @@ for package in monad-par parallel; do
     echo "Package=${package}"
     export PACKAGE=${package}
     mkdir -p outputs/${package}
-    for T in 1024; do
+    for T in 1 2 4 8 16 32 64 128 256 512 1024; do
         echo "  T=${T}"
         for N in 1 2 4 8; do
             echo "    N=${N}"

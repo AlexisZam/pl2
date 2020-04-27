@@ -31,6 +31,13 @@ prodMod p n1 n2 = (n1 * n2) `mod` p
 prodMod' :: Word -> Word -> Word -> Word
 prodMod' p from to = foldl' (prodMod p) 1 [from .. to]
 
+-- seq
+
+chooseMod :: Word -> Word -> Word -> Word
+chooseMod p n k = go (min k (n - k))
+  where
+    go k' = prodMod' p (n - k' + 1) n * invMod p (prodMod' p 1 k') `mod` p
+
 -- monad-par
 
 parTuple2' :: (NFData a, NFData b) => (a, b) -> (a, b)
@@ -82,7 +89,8 @@ mapParallel = Control.Parallel.Strategies.parMap rdeepseq
 enviroment :: NFData b => IO (Word -> Word -> Word -> Word, (a -> b) -> [a] -> [b])
 enviroment = do
   package <- lookupEnv "PACKAGE"
-  return $ case fromMaybe "parallel" package of
+  return $ case fromMaybe "seq" package of
+    "seq" -> (chooseMod, map)
     "parallel" -> (chooseModParallel, mapParallel)
     "monad-par" -> (chooseModMonadPar, mapMonadPar)
     _ -> undefined
@@ -94,8 +102,3 @@ main = do
   let t = read line :: Int
   contents <- getContents
   mapM_ print $ map' ((\[n, k, p] -> chooseMod' p n k) . map read . words) $ take t $ lines contents
-
-chooseMod :: Word -> Word -> Word -> Word
-chooseMod p n k = go (min k (n - k))
-  where
-    go k' = prodMod' p (n - k' + 1) n * invMod p (prodMod' p 1 k') `mod` p
