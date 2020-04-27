@@ -22,7 +22,7 @@ expMod p b e = go (b `mod` p) e `mod` p
 invMod :: Word -> Word -> Word
 invMod p n = expMod p n (p - 2)
 
--- helper functions
+-- utils
 
 prodMod :: Word -> Word -> Word -> Word
 prodMod p n1 n2 = (n1 * n2) `mod` p
