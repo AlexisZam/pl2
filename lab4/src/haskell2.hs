@@ -1,9 +1,9 @@
 {-# LANGUAGE Safe #-}
-{-# OPTIONS_GHC -O2 -Weverything -Wno-implicit-prelude #-}
+{-# OPTIONS_GHC -O2 -Weverything -Wno-all-missed-specialisations -Wno-implicit-prelude -Wno-incomplete-uni-patterns -Wno-orphans #-}
 
 import Control.Monad.State (State, evalState, get, modify', put, runState)
-import Data.Tree (Tree (Node), drawTree, flatten, foldTree, levels, rootLabel)
-import Test.QuickCheck (Arbitrary, Gen, arbitrary, chooseInt, generate, genericShrink, quickCheck, shrink, sized, vectorOf)
+import Data.Tree (Tree (Node), flatten, foldTree, levels, rootLabel)
+import Test.QuickCheck (Arbitrary, Gen, arbitrary, chooseInt, genericShrink, quickCheck, shrink, sized, vectorOf)
 
 -- tree
 
