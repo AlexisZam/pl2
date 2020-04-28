@@ -28,9 +28,6 @@ bfn t = let (t', is) = runState (go t) (1 : is) in t'
       modify' (i + 1 :)
       return $ Node (x, i) ts'
 
-size :: Tree a -> Int
-size = foldTree (\_ xs -> 1 + sum xs)
-
 wrong :: (a -> a -> a) -> Tree a -> Tree a -> Tree a
 wrong f (Node x tsx) (Node y tsy) = Node (f x y) $ zipWith (wrong f) tsx tsy
 
@@ -45,6 +42,9 @@ merge :: (a -> a -> a) -> Tree a -> Tree a -> Tree a
 merge f = go
   where
     go (Node x1 ts1) (Node x2 ts2) = Node (f x1 x2) (zipWith' go ts1 ts2)
+
+size :: Tree a -> Int
+size = foldTree (\_ xs -> 1 + sum xs)
 
 -- quickcheck
 
