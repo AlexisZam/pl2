@@ -80,8 +80,6 @@ prop_SizeGe f t1 t2 = size (f t1 t2) >= max (size t1) (size t2)
 
 main :: IO ()
 main = do
-  t <- generate arbitrary :: IO (Tree Int)
-  putStrLn $ drawTree $ show <$> t
   putStrLn "Ckecking dfn"
   quickCheck (prop_SizeEq dfn :: Tree Int -> Bool)
   quickCheck (prop_RootLabelSnd dfn :: Tree Int -> Bool)
