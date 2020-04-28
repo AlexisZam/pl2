@@ -74,37 +74,12 @@ eof:
 }
 
 int main(int argc, char *argv[]) {
-    int c;
-    extern char *optarg;
-    extern int optind;
-
-#ifdef BEFUNGE93PLUS
-    const char *optstring = "s:h:";
-#else
-    const char *optstring = "s:";
-#endif /* BEFUNGE93PLUS */
-    while ((c = getopt(argc, argv, optstring)) != -1)
-        switch (c) {
-        case 's':
-            fopen(optarg, "w");
-            break;
-#ifdef BEFUNGE93PLUS
-        case 'h':
-            fopen(optarg, "w");
-            break;
-#endif /* BEFUNGE93PLUS */
-        case '?':
-            exit(EXIT_FAILURE);
-        default:
-            exit(EXIT_FAILURE);
-        }
-
     if (argc < 2) {
         fprintf(stderr, "Usage: %s [-s stack] [-h heap] foo.bf\n", argv[0]);
         exit(EXIT_FAILURE);
     }
 
-    parse_program(argv[optind]);
+    parse_program(argv[1]);
 
 #define ASCII 128
     void *labels[] = {[0 ... ASCII - 1] = &&unsupported};
@@ -160,209 +135,173 @@ int main(int argc, char *argv[]) {
     init_heap();
 #endif /* BEFUNGE93PLUS */
 
-    for (;;) {
-        // goto **pc;
-        switch (program[j * WIDTH + i]) {
-        case '0' ... '9':
-        digit:
-            push((struct value){program[j * WIDTH + i] - '0'});
-            NEXT()
-        case '+':
-        add:
-            push((struct value){pop().value + pop().value});
-            NEXT()
-        case '-':
-        subtract : {
-            long_t temp = pop().value;
-            push((struct value){pop().value - temp});
-            NEXT()
-        }
-        case '*':
-        multiply:
-            push((struct value){pop().value * pop().value});
-            NEXT()
-        case '/':
-        divide : {
-            long_t temp = pop().value;
-            if (temp == 0) {
-                pop();
-                printf("What do you want %ld/0 to be? ", temp);
-                scanf("%ld", &temp);
-                push((struct value){temp});
-            } else
-                push((struct value){pop().value / temp});
-            NEXT()
-        }
-        case '%':
-        modulo : {
-            long_t temp = pop().value;
-            if (temp == 0) {
-                pop();
-                printf("What do you want %ld/0 to be? ", temp);
-                scanf("%ld", &temp);
-                push((struct value){temp});
-            } else
-                push((struct value){pop().value % temp});
-            NEXT()
-        }
-        case '!':
-            not : push((struct value){!pop().value});
-            NEXT()
-        case '`':
-        greater : {
-            long_t temp = pop().value;
-            push((struct value){pop().value > temp});
-            NEXT()
-        }
-        case '>':
-        right:
-            di = 1;
-            dj = 0;
-            NEXT()
-        case '<':
-        left:
-            di = -1;
-            dj = 0;
-            NEXT()
-        case 'v':
-        down:
-            di = 0;
-            dj = 1;
-            NEXT()
-        case '^':
-        up:
-            di = 0;
-            dj = -1;
-            NEXT()
-        case '?':
-        random:
-            switch (rand() % 4) {
-            case 0:
-                goto right;
-            case 1:
-                goto left;
-            case 2:
-                goto down;
-            case 3:
-                goto up;
-            }
-        case '_':
-        horizontal_if:
-            if (pop().value)
-                goto left;
-            goto right;
-        case '|':
-        vertical_if:
-            if (pop().value)
-                goto up;
-            goto down;
-        case '"':
-        stringmode:
-            for (;;) {
-                next();
-                print_stack();
-                if (program[j * WIDTH + i] == '"')
-                    break;
-                push((struct value){program[j * WIDTH + i]});
-            }
-            NEXT()
-        case ':':
-        dup : {
-            struct value temp = pop();
-            push(temp);
-            push(temp);
-            NEXT()
-        }
-        case '\\':
-        swap : {
-            struct value temp1 = pop();
-            struct value temp2 = pop();
-            push(temp1);
-            push(temp2);
-            NEXT()
-        }
-        case '$':
-        pop:
-            pop();
-            NEXT()
-        case '.':
-        output_int:
-            printf("%ld ", pop().value);
-            fflush(stdout);
-            NEXT()
-        case ',':
-        output_char:
-            printf("%c", (char)pop().value);
-            fflush(stdout);
-            NEXT()
-        case '#':
-        bridge:
-            next();
-            NEXT()
-        case 'g':
-        get : {
-            long_t temp1 = pop().value;
-            long_t temp2 = pop().value;
-            if (temp1 < 0 || temp1 >= HEIGHT || temp2 < 0 || temp2 >= WIDTH) {
-                fprintf(stderr, "g 'Get' instruction out of bounds (%ld,%ld)\n", temp2, temp1);
-                push((struct value){0});
-            } else
-                push((struct value){program[temp1 * WIDTH + temp2]});
-            NEXT()
-        }
-        case 'p':
-        put : {
-            long_t temp1 = pop().value;
-            long_t temp2 = pop().value;
-            if (temp1 < 0 || temp1 >= HEIGHT || temp2 < 0 || temp2 >= WIDTH) {
-                fprintf(stderr, "p 'Put' instruction out of bounds (%ld,%ld)\n", temp2, temp1);
-                pop();
-            } else {
-                program[temp1 * WIDTH + temp2] = pop().value;
-#ifdef DIRECT_THREADING
-                program_as_labels[temp1 * WIDTH + temp2] = labels[program[temp1 * WIDTH + temp2]];
-#endif /* DIRECT_THREADING */
-            }
-            NEXT()
-        }
-        case '&':
-        input_int : {
-            long_t temp = -1;
-            scanf("%ld", &temp);
-            push((struct value){temp});
-            NEXT()
-        }
-        case '~':
-        input_char:
-            push((struct value){getchar()});
-            NEXT()
-        case '@':
-        end:
-            exit(EXIT_SUCCESS);
-        case ' ':
-        nop:
-            NEXT()
-#ifdef BEFUNGE93PLUS
-        case 'c':
-        cons : {
-            struct value temp = pop();
-            push(allocate(pop(), temp));
-            print_heap();
-            NEXT()
-        }
-        case 'h':
-        head:
-            push(head(pop()));
-            NEXT()
-        case 't':
-        tail:
-            push(tail(pop()));
-            NEXT()
-#endif /* BEFUNGE93PLUS */
-        default:
-        unsupported:
-            fprintf(stderr, "Unsupported instruction '%c' (0x%02x) (maybe not Befunge-93?)\n", program[j * WIDTH + i], program[j * WIDTH + i]);
-            NEXT()
-        }
+    goto **pc;
+digit:
+    push((struct value){program[j * WIDTH + i] - '0'});
+    NEXT()
+add:
+    push((struct value){pop().value + pop().value});
+    NEXT()
+subtract : {
+    long_t temp = pop().value;
+    push((struct value){pop().value - temp});
+    NEXT()
+}
+multiply:
+    push((struct value){pop().value * pop().value});
+    NEXT()
+divide : {
+    long_t temp = pop().value;
+    if (temp == 0) {
+        pop();
+        printf("What do you want %ld/0 to be? ", temp);
+        scanf("%ld", &temp);
+        push((struct value){temp});
+    } else
+        push((struct value){pop().value / temp});
+    NEXT()
+}
+modulo : {
+    long_t temp = pop().value;
+    if (temp == 0) {
+        pop();
+        printf("What do you want %ld/0 to be? ", temp);
+        scanf("%ld", &temp);
+        push((struct value){temp});
+    } else
+        push((struct value){pop().value % temp});
+    NEXT()
+}
+    not : push((struct value){!pop().value});
+    NEXT()
+greater : {
+    long_t temp = pop().value;
+    push((struct value){pop().value > temp});
+    NEXT()
+}
+right:
+    di = 1;
+    dj = 0;
+    NEXT()
+left:
+    di = -1;
+    dj = 0;
+    NEXT()
+down:
+    di = 0;
+    dj = 1;
+    NEXT()
+up:
+    di = 0;
+    dj = -1;
+    NEXT()
+random:
+    switch (rand() % 4) {
+    case 0:
+        goto right;
+    case 1:
+        goto left;
+    case 2:
+        goto down;
+    case 3:
+        goto up;
     }
+horizontal_if:
+    if (pop().value)
+        goto left;
+    goto right;
+vertical_if:
+    if (pop().value)
+        goto up;
+    goto down;
+stringmode:
+    for (;;) {
+        next();
+        print_stack();
+        if (program[j * WIDTH + i] == '"')
+            break;
+        push((struct value){program[j * WIDTH + i]});
+    }
+    NEXT()
+dup : {
+    struct value temp = pop();
+    push(temp);
+    push(temp);
+    NEXT()
+}
+swap : {
+    struct value temp1 = pop();
+    struct value temp2 = pop();
+    push(temp1);
+    push(temp2);
+    NEXT()
+}
+pop:
+    pop();
+    NEXT()
+output_int:
+    printf("%ld ", pop().value);
+    fflush(stdout);
+    NEXT()
+output_char:
+    printf("%c", (char)pop().value);
+    fflush(stdout);
+    NEXT()
+bridge:
+    next();
+    NEXT()
+get : {
+    long_t temp1 = pop().value;
+    long_t temp2 = pop().value;
+    if (temp1 < 0 || temp1 >= HEIGHT || temp2 < 0 || temp2 >= WIDTH) {
+        fprintf(stderr, "g 'Get' instruction out of bounds (%ld,%ld)\n", temp2, temp1);
+        push((struct value){0});
+    } else
+        push((struct value){program[temp1 * WIDTH + temp2]});
+    NEXT()
+}
+put : {
+    long_t temp1 = pop().value;
+    long_t temp2 = pop().value;
+    if (temp1 < 0 || temp1 >= HEIGHT || temp2 < 0 || temp2 >= WIDTH) {
+        fprintf(stderr, "p 'Put' instruction out of bounds (%ld,%ld)\n", temp2, temp1);
+        pop();
+    } else {
+        program[temp1 * WIDTH + temp2] = pop().value;
+#ifdef DIRECT_THREADING
+        program_as_labels[temp1 * WIDTH + temp2] = labels[program[temp1 * WIDTH + temp2]];
+#endif /* DIRECT_THREADING */
+    }
+    NEXT()
+}
+input_int : {
+    long_t temp = -1;
+    scanf("%ld", &temp);
+    push((struct value){temp});
+    NEXT()
+}
+input_char:
+    push((struct value){getchar()});
+    NEXT()
+end:
+    exit(EXIT_SUCCESS);
+nop:
+    NEXT()
+#ifdef BEFUNGE93PLUS
+cons : {
+    struct value temp = pop();
+    push(allocate(pop(), temp));
+    print_heap();
+    NEXT()
+}
+head:
+    push(head(pop()));
+    NEXT()
+tail:
+    push(tail(pop()));
+    NEXT()
+#endif /* BEFUNGE93PLUS */
+unsupported:
+    fprintf(stderr, "Unsupported instruction '%c' (0x%02x) (maybe not Befunge-93?)\n", program[j * WIDTH + i], program[j * WIDTH + i]);
+    NEXT()
 }
