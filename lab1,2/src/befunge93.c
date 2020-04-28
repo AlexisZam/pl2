@@ -7,7 +7,6 @@
 #include <time.h>
 #include <unistd.h>
 
-#ifdef THREADING
 #ifdef DIRECT_THREADING
 #define NEXT()     \
     next();        \
@@ -19,34 +18,22 @@
     print_stack(); \
     goto *labels[program[j * WIDTH + i]];
 #endif /* DIRECT_STHREADING */
-#else
-#define NEXT()     \
-    next();        \
-    print_stack(); \
-    break;
-#endif /* THREADING */
 
 /* Global variables */
 
 int i = 0, j = 0;
 int di = 1, dj = 0;
-#ifdef THREADING
 void **pc;
-#endif /* THREADING */
 
 #define HEIGHT 25
 #define WIDTH 80
 char program[] = {[0 ... HEIGHT * WIDTH - 1] = ' '};
 
 void next() {
-#ifdef THREADING
     int temp1 = j, temp2 = i;
-#endif /* THREADING */
     i = (i + di + WIDTH) % WIDTH;
     j = (j + dj + HEIGHT) % HEIGHT;
-#ifdef THREADING
     pc += (j - temp1) * WIDTH + (i - temp2);
-#endif /* THREADING */
 }
 
 void parse_program(const char *filename) {
@@ -120,7 +107,6 @@ int main(int argc, char *argv[]) {
     parse_program(argv[optind]);
 
 #define ASCII 128
-#ifdef THREADING
     void *labels[] = {[0 ... ASCII - 1] = &&unsupported};
     for (char c = '0'; c <= '9'; c++)
         labels[c] = &&digit;
@@ -156,7 +142,6 @@ int main(int argc, char *argv[]) {
     labels['h'] = &&head;
     labels['t'] = &&tail;
 #endif /* BEFUNGE93PLUS */
-#endif /* THREADING */
 
 #ifdef DIRECT_THREADING
     void *program_as_labels[HEIGHT * WIDTH];
