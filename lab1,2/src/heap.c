@@ -10,13 +10,8 @@ struct cons_cell {
 /* Global variables */
 
 int freelist = 0;
-#ifdef DYNAMIC_HEAP
-int heap_size = 0;
-struct cons_cell *heap = NULL;
-#else
 const int heap_size = HEAP_SIZE;
 struct cons_cell heap[HEAP_SIZE];
-#endif /* DYNAMIC_HEAP */
 
 void DFS(struct value *x) { // TODO: improve DFS
     if (!x->marked) {
@@ -45,10 +40,6 @@ void gc() {
 }
 
 void init_heap() {
-#ifdef DYNAMIC_HEAP
-    heap_size = INIT_HEAP_SIZE;
-    heap = malloc(heap_size * sizeof(struct value));
-#endif /* DYNAMIC_HEAP */
     for (int i = 0; i < heap_size; i++)
         heap[i].head.value = i + 1;
 }
@@ -62,13 +53,8 @@ struct value allocate(struct value head, struct value tail) {
         pop();
         pop();
         if (freelist == heap_size) {
-#ifdef DYNAMIC_HEAP
-            heap_size *= 2;
-            heap = realloc(heap, heap_size * sizeof(struct cons_cell));
-#else
             fprintf(stderr, "Heap overflow\n");
             exit(EXIT_FAILURE);
-#endif /* DYNAMIC_HEAP */
         }
     }
     int temp = freelist;
