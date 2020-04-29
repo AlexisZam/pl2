@@ -1,90 +1,121 @@
 #include <array>
+#include <boost/range/adaptor/reversed.hpp>
+#include <fstream>
 #include <iostream>
 #include <vector>
 
-inline void push(std::vector<long> &stack, const long &value) {
-    stack.push_back(value);
-}
-
-inline long pop(std::vector<long> &stack) { // FIXME return ref
-    if (stack.empty())
-        return 0;
-    long value = stack.back();
-    stack.pop_back();
-    return value;
-}
-
-inline void print_stack(const std::vector<long> &stack) {
-    for (int i = stack.size() - 1; i >= 0; i--)
-        dprintf(3, "%ld ", stack[i]);
-    dprintf(3, "\n");
-}
-
-#define HEIGHT 25
 #define WIDTH 80
+#define HEIGHT 25
 
-inline void next(std::size_t &i, std::size_t &j, const int &di, const int &dj, void **&pc) {
-    std::size_t temp1 = j, temp2 = i;
-    i = (i + di + WIDTH) % WIDTH;
-    j = (j + dj + HEIGHT) % HEIGHT;
-    pc += (j - temp1) * WIDTH + (i - temp2);
-}
-
-void parse_program(std::array<char, HEIGHT * WIDTH> &program, const char *filename) {
-    FILE *stream = fopen(filename, "r");
-    if (!stream) {
-        std::cerr << "Error: couldn't open '" << filename << "' for input.\n";
-        exit(1);
+class State {
+public:
+    State() {
+        for (auto &row : program)
+            row.fill(' ');
+        ofstream.open("vm.stack");
     }
-    std::size_t i = 0, j = 0;
-    for (;;) {
-        int c = fgetc(stream);
-        if (feof(stream))
-            goto eof;
-        if (c == '\n') {
-            i = 0;
-            j++;
-            if (j >= HEIGHT)
-                goto eof;
-        } else {
-            program[j * WIDTH + i] = c;
-            i++;
-            if (i >= WIDTH)
-                for (;;) {
-                    c = fgetc(stream);
-                    if (feof(stream))
-                        goto eof;
-                    if (c == '\n') {
-                        i = 0;
-                        j++;
-                        if (j >= HEIGHT)
-                            goto eof;
-                        break;
-                    }
-                }
+
+    ~State() {
+        while (!stack.empty()) {
+            print_stack();
+            stack.pop_back();
+        }
+        ofstream.close();
+    }
+
+    void read_program(const char *filename) {
+        std::ifstream ifstream;
+        std::string s;
+
+        ifstream.open(filename);
+        if (!ifstream) {
+            std::cerr << "Error: couldn't open '" << filename << "' for input." << std::endl;
+            exit(1);
+        }
+        for (auto &a : program) {
+            if (ifstream.eof())
+                break;
+            std::getline(ifstream, s);
+            s.copy(a.data(), a.size());
+        }
+        ifstream.close();
+    }
+
+    void print_program() {
+        for (auto a : program) {
+            for (auto e : a)
+                std::cout << e;
+            std::cout << std::endl;
         }
     }
-eof:
-    fclose(stream);
-}
+
+    void move(bool print = true) {
+        position.i = (position.i + direction.di + HEIGHT) % HEIGHT;
+        position.j = (position.j + direction.dj + WIDTH) % WIDTH;
+        if (print)
+            print_stack();
+    }
+
+    char command() { // FIXME return reference
+        return program[position.i][position.j];
+    }
+
+    char &command(std::size_t i, std::size_t j) {
+        return program.at(i).at(j);
+    }
+
+    void set_direction(int di, int dj) {
+        direction.di = di;
+        direction.dj = dj;
+    }
+
+    void push(const long &value) { // reference??
+        stack.push_back(value);
+    }
+
+    long pop() { // FIXME return reference
+        if (stack.empty())
+            return 0;
+        long value = stack.back();
+        stack.pop_back();
+        return value;
+    }
+
+    void print_stack() {
+        for (const auto e : boost::adaptors::reverse(stack))
+            ofstream << e << " ";
+        ofstream << std::endl;
+        // cnt++;
+    }
+
+private:
+    std::array<std::array<char, WIDTH>, HEIGHT> program;
+    std::vector<long> stack;
+    std::ofstream ofstream;
+    struct {
+        std::size_t i = 0, j = 0;
+    } position;
+    struct {
+        int di = 0, dj = 1;
+    } direction;
+    // int cnt = 0;
+};
 
 int main(int argc, char *argv[]) {
-    std::array<char, HEIGHT * WIDTH> program;
-    void *program_as_labels[HEIGHT * WIDTH];
-    std::vector<long> stack;
-    std::size_t i = 0, j = 0;
-    int di = 1, dj = 0;
-    void **pc;
+    State state;
+    std::array<void *, 128> labels;
+    long temp, temp1, temp2;
 
     if (argc != 2) {
-        std::cerr << "Usage: " << argv[0] << " foo.bf\n";
+        std::cerr << "Usage: " << argv[0] << " foo.bf" << std::endl;
         exit(1);
     }
 
-    program.fill(' ');
-    parse_program(program, argv[1]);
+    state.read_program(argv[1]);
+    // state.print_program();
 
-    std::array<void *, 128> labels;
+    srand(time(NULL));
+
     labels.fill(&&unsupported);
     for (char c = '0'; c <= '9'; c++)
         labels[c] = &&digit;
@@ -116,98 +147,72 @@ int main(int argc, char *argv[]) {
     labels['@'] = &&end;
     labels[' '] = &&nop;
 
-    for (std::size_t j = 0; j < HEIGHT; j++)
-        for (std::size_t i = 0; i < WIDTH; i++)
-            program_as_labels[j * WIDTH + i] = labels[program[j * WIDTH + i]];
-    pc = program_as_labels;
-
-    srand(time(NULL));
-
-    goto **pc;
+    goto *labels[state.command()];
 digit:
-    push(stack, program[j * WIDTH + i] - '0');
-    next(i, j, di, dj, pc);
-    print_stack(stack);
-    goto **pc;
+    state.push(state.command() - '0');
+    state.move();
+    goto *labels[state.command()];
 add:
-    push(stack, pop(stack) + pop(stack));
-    next(i, j, di, dj, pc);
-    print_stack(stack);
-    goto **pc;
-subtract : {
-    long temp = pop(stack);
-    push(stack, pop(stack) - temp);
-    next(i, j, di, dj, pc);
-    print_stack(stack);
-    goto **pc;
-}
+    state.push(state.pop() + state.pop());
+    state.move();
+    goto *labels[state.command()];
+subtract:
+    temp = state.pop();
+    state.push(state.pop() - temp);
+    state.move();
+    goto *labels[state.command()];
 multiply:
-    push(stack, pop(stack) * pop(stack));
-    next(i, j, di, dj, pc);
-    print_stack(stack);
-    goto **pc;
-divide : {
-    long temp = pop(stack);
+    state.push(state.pop() * state.pop());
+    state.move();
+    goto *labels[state.command()];
+divide:
+    temp = state.pop();
     if (temp == 0) {
-        pop(stack);
+        state.pop();
         std::cout << "What do you want " << temp << "/0 to be? ";
         std::cin >> temp;
-        push(stack, temp);
+        state.push(temp);
     } else
-        push(stack, pop(stack) / temp);
-    next(i, j, di, dj, pc);
-    print_stack(stack);
-    goto **pc;
-}
-modulo : {
-    long temp = pop(stack);
+        state.push(state.pop() / temp);
+    state.move();
+    goto *labels[state.command()];
+modulo:
+    temp = state.pop();
     if (temp == 0) {
-        pop(stack);
+        state.pop();
         std::cout << "What do you want " << temp << "/0 to be? ";
         std::cin >> temp;
-        push(stack, temp);
+        state.push(temp);
     } else
-        push(stack, pop(stack) % temp);
-    next(i, j, di, dj, pc);
-    print_stack(stack);
-    goto **pc;
-}
+        state.push(state.pop() % temp);
+    state.move();
+    goto *labels[state.command()];
 negate:
-    push(stack, !pop(stack));
-    next(i, j, di, dj, pc);
-    print_stack(stack);
-    goto **pc;
-greater : {
-    long temp = pop(stack);
-    push(stack, pop(stack) > temp);
-    next(i, j, di, dj, pc);
-    print_stack(stack);
-    goto **pc;
-}
+    state.push(!state.pop());
+    state.move();
+    goto *labels[state.command()];
+greater:
+    temp = state.pop();
+    state.push(state.pop() > temp);
+    state.move();
+    goto *labels[state.command()];
+
 right:
-    di = 1;
-    dj = 0;
-    next(i, j, di, dj, pc);
-    print_stack(stack);
-    goto **pc;
+    state.set_direction(0, 1);
+    state.move();
+    goto *labels[state.command()];
 left:
-    di = -1;
-    dj = 0;
-    next(i, j, di, dj, pc);
-    print_stack(stack);
-    goto **pc;
+    state.set_direction(0, -1);
+    state.move();
+    goto *labels[state.command()];
 up:
-    di = 0;
-    dj = -1;
-    next(i, j, di, dj, pc);
-    print_stack(stack);
-    goto **pc;
+    state.set_direction(-1, 0);
+    state.move();
+    goto *labels[state.command()];
 down:
-    di = 0;
-    dj = 1;
-    next(i, j, di, dj, pc);
-    print_stack(stack);
-    goto **pc;
+    state.set_direction(1, 0);
+    state.move();
+    goto *labels[state.command()];
 random:
     switch (rand() % 4) {
     case 0:
@@ -220,109 +225,98 @@ random:
         goto up;
     }
 horizontal_if:
-    if (pop(stack))
+    if (state.pop())
         goto left;
     goto right;
 vertical_if:
-    if (pop(stack))
+    if (state.pop())
         goto up;
     goto down;
+
 stringmode:
     for (;;) {
-        next(i, j, di, dj, pc);
-        print_stack(stack);
-        if (program[j * WIDTH + i] == '"')
+        state.move();
+        if (state.command() == '"')
             break;
-        push(stack, program[j * WIDTH + i]);
+        state.push(state.command());
     }
-    next(i, j, di, dj, pc);
-    print_stack(stack);
-    goto **pc;
-dup : {
-    long temp = pop(stack);
-    push(stack, temp);
-    push(stack, temp);
-    next(i, j, di, dj, pc);
-    print_stack(stack);
-    goto **pc;
-}
-swap : {
-    long temp1 = pop(stack);
-    long temp2 = pop(stack);
-    push(stack, temp1);
-    push(stack, temp2);
-    next(i, j, di, dj, pc);
-    print_stack(stack);
-    goto **pc;
-}
+    state.move();
+    goto *labels[state.command()];
+
+dup:
+    temp = state.pop();
+    state.push(temp);
+    state.push(temp);
+    state.move();
+    goto *labels[state.command()];
+swap:
+    temp1 = state.pop();
+    temp2 = state.pop();
+    state.push(temp1);
+    state.push(temp2);
+    state.move();
+    goto *labels[state.command()];
 pop:
-    pop(stack);
-    next(i, j, di, dj, pc);
-    print_stack(stack);
-    goto **pc;
+    state.pop();
+    state.move();
+    goto *labels[state.command()];
+
 output_int:
-    std::cout << pop(stack) << std::flush;
-    next(i, j, di, dj, pc);
-    print_stack(stack);
-    goto **pc;
+    std::cout << state.pop() << ' ' << std::flush;
+    state.move();
+    goto *labels[state.command()];
 output_char:
-    std::cout << char(pop(stack)) << std::flush;
-    next(i, j, di, dj, pc);
-    print_stack(stack);
-    goto **pc;
+    std::cout << char(state.pop()) << std::flush;
+    state.move();
+    goto *labels[state.command()];
+
 bridge:
-    next(i, j, di, dj, pc);
-    next(i, j, di, dj, pc);
-    print_stack(stack);
-    goto **pc;
-get : {
-    long temp1 = pop(stack);
-    long temp2 = pop(stack);
-    if (temp1 < 0 || temp1 >= HEIGHT || temp2 < 0 || temp2 >= WIDTH) {
-        std::cerr << "g 'Get' instruction out of bounds (" << temp2 << "," << temp1 << ")\n";
-        push(stack, 0);
-    } else
-        push(stack, program[temp1 * WIDTH + temp2]);
-    next(i, j, di, dj, pc);
-    print_stack(stack);
-    goto **pc;
-}
-put : {
-    long temp1 = pop(stack);
-    long temp2 = pop(stack);
-    if (temp1 < 0 || temp1 >= HEIGHT || temp2 < 0 || temp2 >= WIDTH) {
-        std::cerr << "p 'Put' instruction out of bounds (" << temp2 << "," << temp1 << ")\n";
-        pop(stack);
-    } else {
-        program[temp1 * WIDTH + temp2] = char(pop(stack));
-        program_as_labels[temp1 * WIDTH + temp2] = labels[program[temp1 * WIDTH + temp2]];
+    state.move(false);
+    state.move();
+    goto *labels[state.command()];
+
+get:
+    temp1 = state.pop();
+    temp2 = state.pop();
+    try {
+        state.push(state.command(temp1, temp2));
+    } catch (std::out_of_range) {
+        std::cerr << "g 'Get' instruction out of bounds (" << temp2 << "," << temp1 << ")" << std::endl;
+        state.push(0);
     }
-    next(i, j, di, dj, pc);
-    print_stack(stack);
-    goto **pc;
-}
-input_int : {
-    long temp = -1;
+    state.move();
+    goto *labels[state.command()];
+put:
+    temp1 = state.pop();
+    temp2 = state.pop();
+    try {
+        state.command(temp1, temp2) = char(state.pop());
+    } catch (std::out_of_range) {
+        std::cerr << "p 'Put' instruction out of bounds (" << temp2 << "," << temp1 << ")" << std::endl;
+        state.pop();
+    }
+    state.move();
+    goto *labels[state.command()];
+
+input_int:
     std::cin >> temp;
-    push(stack, temp);
-    next(i, j, di, dj, pc);
-    print_stack(stack);
-    goto **pc;
-}
+    state.push(temp);
+    state.move();
+    goto *labels[state.command()];
 input_character:
-    push(stack, getchar());
-    next(i, j, di, dj, pc);
-    print_stack(stack);
-    goto **pc;
+    state.push(getchar());
+    state.move();
+    goto *labels[state.command()];
+
 end:
     exit(0);
+
 nop:
-    next(i, j, di, dj, pc);
-    print_stack(stack);
-    goto **pc;
+    state.move();
+    goto *labels[state.command()];
+
 unsupported:
-    fprintf(stderr, "Unsupported instruction '%c' (0x%02x) (maybe not Befunge-93?)\n", program[j * WIDTH + i], program[j * WIDTH + i]);
-    next(i, j, di, dj, pc);
-    print_stack(stack);
-    goto **pc;
+    fprintf(stderr, "Unsupported instruction '%c' (0x%02x) (maybe not Befunge-93?)\n", state.command(), state.command());
+    state.move();
+    goto *labels[state.command()];
 }

@@ -1,4 +1,4 @@
-CXXFLAGS = -g -Wall -Wextra -Wno-char-subscripts
+CXXFLAGS = -O3 -std=gnu++17 -Wall -Wextra -Wno-char-subscripts
 
 .PHONY:	all clean
 
