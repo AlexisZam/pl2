@@ -81,6 +81,24 @@ public:
         return value;
     }
 
+    void dup() {
+        if (stack.empty())
+            stack.push_back(0);
+        else
+            stack.push_back(stack.back());
+    }
+
+    void swap() {
+        std::size_t size = stack.size();
+        if (size == 0) {
+            stack.push_back(0);
+            stack.push_back(0);
+        } else if (size == 1)
+            stack.push_back(0);
+        else
+            std::swap(stack.back(), *(stack.end() - 2));
+    }
+
     void print_stack() {
         for (const auto e : boost::adaptors::reverse(stack))
             ofstream << e << " ";
@@ -244,16 +262,11 @@ stringmode:
     goto *labels[state.command()];
 
 dup:
-    temp = state.pop();
-    state.push(temp);
-    state.push(temp);
+    state.dup();
     state.move();
     goto *labels[state.command()];
 swap:
-    temp1 = state.pop();
-    temp2 = state.pop();
-    state.push(temp1);
-    state.push(temp2);
+    state.swap();
     state.move();
     goto *labels[state.command()];
 pop:
