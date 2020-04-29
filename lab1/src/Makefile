@@ -1,4 +1,4 @@
-CXXFLAGS = -O3 -Wall -Wextra
+CXXFLAGS = -g -Wall -Wextra -Wno-char-subscripts
 
 .PHONY:	all clean
 

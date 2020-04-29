@@ -1,55 +1,36 @@
+#include <array>
 #include <iostream>
-#include <stdio.h>
-#include <stdlib.h>
-#include <sys/types.h>
-#include <time.h>
-#include <unistd.h>
 #include <vector>
 
-/* Prototypes */
-
-void push(long);
-void pop(long);
-void print_stack(long);
-
-/* Stack */
-
-std::vector<long> stack;
-
-void push(long value) {
+inline void push(std::vector<long> &stack, const long &value) {
     stack.push_back(value);
 }
 
-long pop() {
+inline long pop(std::vector<long> &stack) { // FIXME return ref
     if (stack.empty())
         return 0;
-    long value = stack.back(); // FIXME reference
+    long value = stack.back();
     stack.pop_back();
     return value;
 }
 
-void print_stack() {
+inline void print_stack(const std::vector<long> &stack) {
     for (int i = stack.size() - 1; i >= 0; i--)
         dprintf(3, "%ld ", stack[i]);
     dprintf(3, "\n");
 }
 
-std::size_t i = 0, j = 0;
-int di = 1, dj = 0;
-void **pc;
-
 #define HEIGHT 25
 #define WIDTH 80
-char program[HEIGHT * WIDTH] = {' '};
 
-void next() {
+inline void next(std::size_t &i, std::size_t &j, const int &di, const int &dj, void **&pc) {
     std::size_t temp1 = j, temp2 = i;
     i = (i + di + WIDTH) % WIDTH;
     j = (j + dj + HEIGHT) % HEIGHT;
     pc += (j - temp1) * WIDTH + (i - temp2);
 }
 
-void parse_program(const char *filename) {
+void parse_program(std::array<char, HEIGHT * WIDTH> &program, const char *filename) {
     FILE *stream = fopen(filename, "r");
     if (!stream) {
         std::cerr << "Error: couldn't open '" << filename << "' for input.\n";
@@ -88,14 +69,23 @@ eof:
 }
 
 int main(int argc, char *argv[]) {
+    std::array<char, HEIGHT * WIDTH> program;
+    void *program_as_labels[HEIGHT * WIDTH];
+    std::vector<long> stack;
+    std::size_t i = 0, j = 0;
+    int di = 1, dj = 0;
+    void **pc;
+
     if (argc != 2) {
         std::cerr << "Usage: " << argv[0] << " foo.bf\n";
         exit(1);
     }
 
-    parse_program(argv[1]);
+    program.fill(' ');
+    parse_program(program, argv[1]);
 
-    void *labels[128] = {&&unsupported};
+    std::array<void *, 128> labels;
+    labels.fill(&&unsupported);
     for (char c = '0'; c <= '9'; c++)
         labels[c] = &&digit;
     labels['+'] = &&add;
@@ -126,7 +116,6 @@ int main(int argc, char *argv[]) {
     labels['@'] = &&end;
     labels[' '] = &&nop;
 
-    void *program_as_labels[HEIGHT * WIDTH];
     for (std::size_t j = 0; j < HEIGHT; j++)
         for (std::size_t i = 0; i < WIDTH; i++)
             program_as_labels[j * WIDTH + i] = labels[program[j * WIDTH + i]];
@@ -136,88 +125,88 @@ int main(int argc, char *argv[]) {
 
     goto **pc;
 digit:
-    push(program[j * WIDTH + i] - '0');
-    next();
-    print_stack();
+    push(stack, program[j * WIDTH + i] - '0');
+    next(i, j, di, dj, pc);
+    print_stack(stack);
     goto **pc;
 add:
-    push(pop() + pop());
-    next();
-    print_stack();
+    push(stack, pop(stack) + pop(stack));
+    next(i, j, di, dj, pc);
+    print_stack(stack);
     goto **pc;
 subtract : {
-    long temp = pop();
-    push(pop() - temp);
-    next();
-    print_stack();
+    long temp = pop(stack);
+    push(stack, pop(stack) - temp);
+    next(i, j, di, dj, pc);
+    print_stack(stack);
     goto **pc;
 }
 multiply:
-    push(pop() * pop());
-    next();
-    print_stack();
+    push(stack, pop(stack) * pop(stack));
+    next(i, j, di, dj, pc);
+    print_stack(stack);
     goto **pc;
 divide : {
-    long temp = pop();
+    long temp = pop(stack);
     if (temp == 0) {
-        pop();
+        pop(stack);
         std::cout << "What do you want " << temp << "/0 to be? ";
         std::cin >> temp;
-        push(temp);
+        push(stack, temp);
     } else
-        push(pop() / temp);
-    next();
-    print_stack();
+        push(stack, pop(stack) / temp);
+    next(i, j, di, dj, pc);
+    print_stack(stack);
     goto **pc;
 }
 modulo : {
-    long temp = pop();
+    long temp = pop(stack);
     if (temp == 0) {
-        pop();
+        pop(stack);
         std::cout << "What do you want " << temp << "/0 to be? ";
         std::cin >> temp;
-        push(temp);
+        push(stack, temp);
     } else
-        push(pop() % temp);
-    next();
-    print_stack();
+        push(stack, pop(stack) % temp);
+    next(i, j, di, dj, pc);
+    print_stack(stack);
     goto **pc;
 }
 negate:
-    push(!pop());
-    next();
-    print_stack();
+    push(stack, !pop(stack));
+    next(i, j, di, dj, pc);
+    print_stack(stack);
     goto **pc;
 greater : {
-    long temp = pop();
-    push(pop() > temp);
-    next();
-    print_stack();
+    long temp = pop(stack);
+    push(stack, pop(stack) > temp);
+    next(i, j, di, dj, pc);
+    print_stack(stack);
     goto **pc;
 }
 right:
     di = 1;
     dj = 0;
-    next();
-    print_stack();
+    next(i, j, di, dj, pc);
+    print_stack(stack);
     goto **pc;
 left:
     di = -1;
     dj = 0;
-    next();
-    print_stack();
+    next(i, j, di, dj, pc);
+    print_stack(stack);
     goto **pc;
 up:
     di = 0;
     dj = -1;
-    next();
-    print_stack();
+    next(i, j, di, dj, pc);
+    print_stack(stack);
     goto **pc;
 down:
     di = 0;
     dj = 1;
-    next();
-    print_stack();
+    next(i, j, di, dj, pc);
+    print_stack(stack);
     goto **pc;
 random:
     switch (rand() % 4) {
@@ -231,109 +220,109 @@ random:
         goto up;
     }
 horizontal_if:
-    if (pop())
+    if (pop(stack))
         goto left;
     goto right;
 vertical_if:
-    if (pop())
+    if (pop(stack))
         goto up;
     goto down;
 stringmode:
     for (;;) {
-        next();
-        print_stack();
+        next(i, j, di, dj, pc);
+        print_stack(stack);
         if (program[j * WIDTH + i] == '"')
             break;
-        push(program[j * WIDTH + i]);
+        push(stack, program[j * WIDTH + i]);
     }
-    next();
-    print_stack();
+    next(i, j, di, dj, pc);
+    print_stack(stack);
     goto **pc;
 dup : {
-    long temp = pop();
-    push(temp);
-    push(temp);
-    next();
-    print_stack();
+    long temp = pop(stack);
+    push(stack, temp);
+    push(stack, temp);
+    next(i, j, di, dj, pc);
+    print_stack(stack);
     goto **pc;
 }
 swap : {
-    long temp1 = pop();
-    long temp2 = pop();
-    push(temp1);
-    push(temp2);
-    next();
-    print_stack();
+    long temp1 = pop(stack);
+    long temp2 = pop(stack);
+    push(stack, temp1);
+    push(stack, temp2);
+    next(i, j, di, dj, pc);
+    print_stack(stack);
     goto **pc;
 }
 pop:
-    pop();
-    next();
-    print_stack();
+    pop(stack);
+    next(i, j, di, dj, pc);
+    print_stack(stack);
     goto **pc;
 output_int:
-    std::cout << pop() << std::flush;
-    next();
-    print_stack();
+    std::cout << pop(stack) << std::flush;
+    next(i, j, di, dj, pc);
+    print_stack(stack);
     goto **pc;
 output_char:
-    std::cout << char(pop()) << std::flush;
-    next();
-    print_stack();
+    std::cout << char(pop(stack)) << std::flush;
+    next(i, j, di, dj, pc);
+    print_stack(stack);
     goto **pc;
 bridge:
-    next();
-    next();
-    print_stack();
+    next(i, j, di, dj, pc);
+    next(i, j, di, dj, pc);
+    print_stack(stack);
     goto **pc;
 get : {
-    long temp1 = pop();
-    long temp2 = pop();
+    long temp1 = pop(stack);
+    long temp2 = pop(stack);
     if (temp1 < 0 || temp1 >= HEIGHT || temp2 < 0 || temp2 >= WIDTH) {
         std::cerr << "g 'Get' instruction out of bounds (" << temp2 << "," << temp1 << ")\n";
-        push(0);
+        push(stack, 0);
     } else
-        push(program[temp1 * WIDTH + temp2]);
-    next();
-    print_stack();
+        push(stack, program[temp1 * WIDTH + temp2]);
+    next(i, j, di, dj, pc);
+    print_stack(stack);
     goto **pc;
 }
 put : {
-    long temp1 = pop();
-    long temp2 = pop();
+    long temp1 = pop(stack);
+    long temp2 = pop(stack);
     if (temp1 < 0 || temp1 >= HEIGHT || temp2 < 0 || temp2 >= WIDTH) {
         std::cerr << "p 'Put' instruction out of bounds (" << temp2 << "," << temp1 << ")\n";
-        pop();
+        pop(stack);
     } else {
-        program[temp1 * WIDTH + temp2] = char(pop());
+        program[temp1 * WIDTH + temp2] = char(pop(stack));
         program_as_labels[temp1 * WIDTH + temp2] = labels[program[temp1 * WIDTH + temp2]];
     }
-    next();
-    print_stack();
+    next(i, j, di, dj, pc);
+    print_stack(stack);
     goto **pc;
 }
 input_int : {
     long temp = -1;
     std::cin >> temp;
-    push(temp);
-    next();
-    print_stack();
+    push(stack, temp);
+    next(i, j, di, dj, pc);
+    print_stack(stack);
     goto **pc;
 }
 input_character:
-    push(getchar());
-    next();
-    print_stack();
+    push(stack, getchar());
+    next(i, j, di, dj, pc);
+    print_stack(stack);
     goto **pc;
 end:
     exit(0);
 nop:
-    next();
-    print_stack();
+    next(i, j, di, dj, pc);
+    print_stack(stack);
     goto **pc;
 unsupported:
     fprintf(stderr, "Unsupported instruction '%c' (0x%02x) (maybe not Befunge-93?)\n", program[j * WIDTH + i], program[j * WIDTH + i]);
-    next();
-    print_stack();
+    next(i, j, di, dj, pc);
+    print_stack(stack);
     goto **pc;
 }
