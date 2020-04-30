@@ -169,6 +169,7 @@ digit:
     state.push(state.command() - '0');
     state.move();
     goto *labels[state.command()];
+/* Stack */
 add:
     state.push(state.pop() + state.pop());
     state.move();
@@ -213,7 +214,7 @@ greater:
     state.push(state.pop() > temp);
     state.move();
     goto *labels[state.command()];
-
+/* Program */
 right:
     state.set_direction(0, 1);
     state.move();
@@ -241,6 +242,7 @@ random:
     case 3:
         goto down;
     }
+/* Stack and Program */
 horizontal_if:
     if (state.pop())
         goto left;
@@ -259,7 +261,7 @@ stringmode:
     }
     state.move();
     goto *labels[state.command()];
-
+/* Stack */
 dup:
     state.dup();
     state.move();
@@ -272,7 +274,7 @@ pop:
     state.pop();
     state.move();
     goto *labels[state.command()];
-
+/* Program and Output */
 output_int:
     std::cout << state.pop() << ' ' << std::flush;
     state.move();
@@ -286,7 +288,7 @@ bridge:
     state.move(false);
     state.move();
     goto *labels[state.command()];
-
+/* Stack and Program */
 get:
     temp1 = state.pop();
     temp2 = state.pop();

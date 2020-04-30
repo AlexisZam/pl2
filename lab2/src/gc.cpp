@@ -42,14 +42,6 @@ public:
         ifstream.close();
     }
 
-    void print_program() {
-        for (auto a : program) {
-            for (auto e : a)
-                std::cout << e;
-            std::cout << std::endl;
-        }
-    }
-
     void move() {
         position.i = (position.i + direction.di + HEIGHT) % HEIGHT;
         position.j = (position.j + direction.dj + WIDTH) % WIDTH;
@@ -109,10 +101,9 @@ public:
         }
         Value tail = pop_value();
         Value head = pop_value();
-        std::size_t previous = freelist;
-        stack.push_back(Value(previous, true, false));
+        stack.push_back(Value(freelist, true, false));
+        heap[freelist] = ConsCell(head, tail);
         freelist = heap[freelist].head.value;
-        heap[previous] = ConsCell(head, tail);
     }
 
     void head() {
