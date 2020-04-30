@@ -3,7 +3,7 @@ PL2_DIR=${HOME}/Workspace/pl2
 
 cd ${PL2_DIR}/lab1/src
 make >/dev/null
-for test in $(ls ../eg/~/d*.bf); do
+for test in $(ls ../eg/random/*.bf); do
     input=${test%.*}.in
     [ -f ${input} ] || input=/dev/stdin
     echo $(basename ${test})
@@ -13,7 +13,7 @@ for test in $(ls ../eg/~/d*.bf); do
     ./vm ${test} <${input} >vm.out 2>vm.err
     sed -i 1d bef.out
     diff -q *.out
-    [ $? -eq 0 ] || exit 1
+    # [ $? -eq 0 ] || exit 1
     diff -q *.err
     diff -q *.stack
 done

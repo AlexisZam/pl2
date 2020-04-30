@@ -1,227 +1,257 @@
+#include <array>
+#include <boost/range/adaptor/reversed.hpp>
+#include <fstream>
 #include <iostream>
-#include <stdio.h>
-#include <stdlib.h>
-#include <sys/types.h>
-#include <time.h>
-#include <unistd.h>
 #include <vector>
 
-#define NEXT()     \
-    next();        \
-    print_stack(); \
-    goto **pc;
-
-/* Types */
-
-typedef int64_t long_t;
-struct Value {
-    long_t value : 62;
-    bool pointer : 1;
-    bool marked : 1;
-
-    Value() {}
-    explicit Value(long_t v) : value(v), pointer(0), marked(0) {}
-    Value(long_t v, bool p, bool m) : value(v), pointer(p), marked(m) {}
-};
-
-/* Stack */
-
-static void DFS(Value *);
-
-static std::vector<Value> stack;
-
-static void init_stack() {
-    stack.reserve(1024 * 1024);
-}
-
-static void push(Value value) {
-    stack.push_back(value);
-}
-
-static Value pop() {
-    if (stack.empty())
-        return Value(0);
-    Value value = stack.back(); // FIXME reference
-    stack.pop_back();
-    return value;
-}
-
-static void print_stack() {
-    for (int i = stack.size() - 1; i >= 0; i--) {
-        if (stack[i].marked)
-            dprintf(3, "\033[1;31m");
-        dprintf(3, "%ld:%d ",
-                stack[i].value, stack[i].pointer);
-        dprintf(3, "\033[0m");
-    }
-    dprintf(3, "\n");
-}
-
-// TODO: stack used as adresses are implicitly cast, and conversely
-// TODO: should we type check?
-
-void mark() {
-    for (std::size_t i = 0; i < stack.size(); i++)
-        if (stack[i].pointer)
-            DFS(&stack[i]);
-    // print_heap();
-    // print_stack();
-}
-
-/* Heap */
-
+#define WIDTH 80
+#define HEIGHT 25
+#define STACK_SIZE (1024 * 1024)
 #define HEAP_SIZE (16 * 1024 * 1024)
 
-struct ConsCell {
-    Value head;
-    Value tail;
+class State {
+public:
+    State() {
+        for (auto &row : program)
+            row.fill(' ');
+        stack.reserve(STACK_SIZE);
+        for (std::size_t i = 0; i < heap.size(); i++)
+            heap[i].head.value = i + 1;
+        ofstream.open("vm.stack");
+    }
 
-    ConsCell() {}
-    ConsCell(Value h, Value t) : head(h), tail(t) {}
+    ~State() {
+        while (!stack.empty()) {
+            // print_stack();
+            stack.pop_back();
+        }
+        ofstream.close();
+    }
+
+    void read_program(const char *filename) {
+        std::ifstream ifstream;
+        std::string s;
+
+        ifstream.open(filename);
+        if (!ifstream) {
+            std::cerr << "Error: couldn't open '" << filename << "' for input." << std::endl;
+            exit(1);
+        }
+        for (auto &a : program) {
+            if (ifstream.eof())
+                break;
+            std::getline(ifstream, s);
+            s.copy(a.data(), a.size());
+        }
+        ifstream.close();
+    }
+
+    void print_program() {
+        for (auto a : program) {
+            for (auto e : a)
+                std::cout << e;
+            std::cout << std::endl;
+        }
+    }
+
+    void move(bool print = true) {
+        position.i = (position.i + direction.di + HEIGHT) % HEIGHT;
+        position.j = (position.j + direction.dj + WIDTH) % WIDTH;
+        // if (print)
+        //     print_stack();
+    }
+
+    char command() { // FIXME return reference
+        return program[position.i][position.j];
+    }
+
+    char &command(std::size_t i, std::size_t j) {
+        return program.at(i).at(j);
+    }
+
+    void set_direction(int di, int dj) {
+        direction.di = di;
+        direction.dj = dj;
+    }
+
+    void push(const int64_t &value) { // reference??
+        stack.push_back(Value(value));
+    }
+
+    int64_t pop() { // FIXME return reference
+        if (stack.empty())
+            return 0;
+        int64_t value = stack.back().value;
+        stack.pop_back();
+        return value;
+    }
+
+    void dup() {
+        if (stack.empty()) {
+            stack.push_back(Value(0));
+            stack.push_back(Value(0));
+        } else
+            stack.push_back(stack.back());
+    }
+
+    void swap() {
+        std::size_t size = stack.size();
+        if (size == 0) {
+            stack.push_back(Value(0));
+            stack.push_back(Value(0));
+        } else if (size == 1)
+            stack.push_back(Value(0));
+        else
+            std::swap(stack.back(), *(stack.end() - 2));
+    }
+
+    void print_stack() {
+        for (const auto e : boost::adaptors::reverse(stack)) {
+            if (e.marked)
+                ofstream << "\033[1;31m";
+            ofstream << "\033[1;31m" << e.value << ":" << e.pointer << " \033[0m";
+        }
+        ofstream << std::endl;
+        cnt++;
+    }
+
+    // TODO: stack used as adresses are implicitly cast, and conversely
+    // TODO: should we type check?
+
+    void allocate() {
+        try {
+            std::size_t temp = freelist;
+            freelist = heap.at(freelist).head.value;
+            Value tail = pop_value();
+            heap[temp] = ConsCell(pop_value(), tail);
+            stack.push_back(Value(temp, true, false));
+        } catch (std::out_of_range) {
+            gc();
+            if (freelist == heap.size()) {
+                std::cerr << "Heap overflow\n";
+                exit(1);
+            }
+        }
+    }
+
+    void head() {
+        stack.push_back(heap[pop()].head);
+    }
+
+    void tail() {
+        stack.push_back(heap[pop()].tail);
+    }
+
+    // void print_heap() {
+    //     std::size_t temp = freelist;
+    //     dprintf(4, "(((%d))) ", temp);
+    //     for (std::size_t i = 0; i < HEAP_SIZE; i++)
+    //         if (i == temp) {
+    //             dprintf(4, "(((%d))) ", temp);
+    //             temp = heap[temp].head.value;
+    //         } else {
+    //             if (heap[i].head.marked || heap[i].tail.marked)
+    //                 dprintf(4, "\033[1;31m");
+    //             dprintf(4, "(%ld:%d,%ld:%d) ",
+    //                     heap[i].head.value, heap[i].head.pointer, heap[i].tail.value, heap[i].tail.pointer);
+    //             dprintf(4, "\033[0m");
+    //         }
+    //     dprintf(4, "\n");
+    // }
+
+    // TODO: copying
+
+private:
+    std::array<std::array<char, WIDTH>, HEIGHT> program;
+    struct {
+        std::size_t i = 0, j = 0;
+    } position;
+    struct {
+        int di = 0, dj = 1;
+    } direction;
+    int cnt = 0;
+
+    struct Value {
+        int64_t value : 62;
+        bool pointer : 1;
+        bool marked : 1;
+
+        Value() {}
+        Value(int64_t v, bool p = 0, bool m = 0) : value(v), pointer(p), marked(m) {}
+    };
+    std::vector<Value> stack;
+
+    struct ConsCell {
+        Value head;
+        Value tail;
+
+        ConsCell() {}
+        ConsCell(Value h, Value t) : head(h), tail(t) {}
+    };
+    std::array<ConsCell, HEAP_SIZE> heap;
+    std::size_t freelist = 0;
+
+    std::ofstream ofstream;
+
+    Value pop_value() { // FIXME return reference
+        if (stack.empty())
+            return 0;
+        Value value = stack.back();
+        stack.pop_back();
+        return value;
+    }
+
+    void DFS(Value &x) { // TODO: improve DFS
+        if (!x.marked) {
+            x.marked = true;
+            if (x.pointer) {
+                DFS(heap[x.value].head);
+                DFS(heap[x.value].tail);
+            }
+        }
+    }
+
+    void mark() {
+        for (std::size_t i = 0; i < stack.size(); i++)
+            if (stack[i].pointer)
+                DFS(stack[i]);
+        // print_heap();
+        // print_stack();
+    }
+
+    void sweep() {
+        for (int i = heap.size() - 1; i >= 0; i--) {
+            if (heap[i].head.marked)
+                heap[i].head.marked = heap[i].tail.marked = false;
+            else {
+                heap[i].head.value = freelist;
+                freelist = i;
+            }
+        }
+    }
+
+    void gc() {
+        mark();
+        sweep();
+    }
 };
 
-static std::size_t freelist = 0;
-static ConsCell heap[HEAP_SIZE];
-
-static void DFS(Value *x) { // TODO: improve DFS
-    if (!x->marked) {
-        x->marked = true;
-        if (x->pointer) {
-            DFS(&heap[x->value].head);
-            DFS(&heap[x->value].tail);
-        }
-    }
-}
-
-static void sweep() {
-    for (int i = HEAP_SIZE - 1; i >= 0; i--) {
-        if (heap[i].head.marked)
-            heap[i].head.marked = heap[i].tail.marked = false;
-        else {
-            heap[i].head.value = freelist;
-            freelist = i;
-        }
-    }
-}
-
-static void gc() {
-    mark();
-    sweep();
-}
-
-static void init_heap() {
-    for (std::size_t i = 0; i < HEAP_SIZE; i++)
-        heap[i].head.value = i + 1;
-}
-
-static Value allocate(Value head, Value tail) {
-    if (freelist == HEAP_SIZE) {
-        push(head);
-        push(tail);
-        gc();
-        pop();
-        pop();
-        if (freelist == HEAP_SIZE) {
-            std::cerr << "Heap overflow\n";
-            exit(EXIT_FAILURE);
-        }
-    }
-    std::size_t temp = freelist;
-    freelist = heap[freelist].head.value;
-    heap[temp] = ConsCell(head, tail);
-    return Value(temp, true, false);
-}
-
-static Value head(Value address) {
-    return heap[address.value].head;
-}
-
-static Value tail(Value address) {
-    return heap[address.value].tail;
-}
-
-static void print_heap() {
-    std::size_t temp = freelist;
-    dprintf(4, "(((%d))) ", temp);
-    for (std::size_t i = 0; i < HEAP_SIZE; i++)
-        if (i == temp) {
-            dprintf(4, "(((%d))) ", temp);
-            temp = heap[temp].head.value;
-        } else {
-            if (heap[i].head.marked || heap[i].tail.marked)
-                dprintf(4, "\033[1;31m");
-            dprintf(4, "(%ld:%d,%ld:%d) ",
-                    heap[i].head.value, heap[i].head.pointer, heap[i].tail.value, heap[i].tail.pointer);
-            dprintf(4, "\033[0m");
-        }
-    dprintf(4, "\n");
-}
-
-// TODO: copying
-
-/* Global variables */
-
-static std::size_t i = 0, j = 0;
-static int di = 1, dj = 0;
-static void **pc;
-
-#define HEIGHT 25
-#define WIDTH 80
-static char program[HEIGHT * WIDTH] = {' '};
-
-static void next() {
-    std::size_t temp1 = j, temp2 = i;
-    i = (i + di + WIDTH) % WIDTH;
-    j = (j + dj + HEIGHT) % HEIGHT;
-    pc += (j - temp1) * WIDTH + (i - temp2);
-}
-
-static void parse_program(const char *filename) {
-    FILE *stream = fopen(filename, "r");
-    if (!stream) {
-        std::cerr << "Error: couldn't open '" << filename << "' for input.\n";
-        exit(EXIT_FAILURE);
-    }
-    for (;;) {
-        int c = fgetc(stream);
-        if (feof(stream))
-            goto eof;
-        if (c == '\n') {
-            i = 0;
-            j++;
-            if (j >= HEIGHT)
-                goto eof;
-        } else {
-            program[j * WIDTH + i] = c;
-            i++;
-            if (i >= WIDTH)
-                for (;;) {
-                    c = fgetc(stream);
-                    if (feof(stream))
-                        goto eof;
-                    if (c == '\n') {
-                        i = 0;
-                        j++;
-                        if (j >= HEIGHT)
-                            goto eof;
-                        break;
-                    }
-                }
-        }
-    }
-eof:
-    fclose(stream);
-}
-
 int main(int argc, char *argv[]) {
+    State state;
+    std::array<void *, 128> labels;
+    int64_t temp, temp1, temp2;
+
     if (argc != 2) {
-        std::cerr << "Usage: " << argv[0] << " foo.bf\n";
-        exit(EXIT_FAILURE);
+        std::cerr << "Usage: " << argv[0] << " foo.bf" << std::endl;
+        exit(1);
     }
 
-    parse_program(argv[1]);
+    state.read_program(argv[1]);
+    // state.print_program();
 
-    void *labels[128] = {&&unsupported};
+    srand(42); // FIXME
+
+    labels.fill(&&unsupported);
     for (char c = '0'; c <= '9'; c++)
         labels[c] = &&digit;
     labels['+'] = &&add;
@@ -255,181 +285,185 @@ int main(int argc, char *argv[]) {
     labels['h'] = &&head;
     labels['t'] = &&tail;
 
-    void *program_as_labels[HEIGHT * WIDTH];
-    for (std::size_t j = 0; j < HEIGHT; j++)
-        for (std::size_t i = 0; i < WIDTH; i++)
-            program_as_labels[j * WIDTH + i] = labels[program[j * WIDTH + i]];
-    pc = program_as_labels;
-
-    i = j = 0;
-
-    srand(time(NULL));
-
-    init_stack();
-    init_heap();
-
-    goto **pc;
+    goto *labels[state.command()];
 digit:
-    push(Value(program[j * WIDTH + i] - '0'));
-    NEXT()
+    state.push(state.command() - '0');
+    state.move();
+    goto *labels[state.command()];
 add:
-    push(Value(pop().value + pop().value));
-    NEXT()
-subtract : {
-    long_t temp = pop().value;
-    push(Value(pop().value - temp));
-    NEXT()
-}
+    state.push(state.pop() + state.pop());
+    state.move();
+    goto *labels[state.command()];
+subtract:
+    temp = state.pop();
+    state.push(state.pop() - temp);
+    state.move();
+    goto *labels[state.command()];
 multiply:
-    push(Value(pop().value * pop().value));
-    NEXT()
-divide : {
-    long_t temp = pop().value;
+    state.push(state.pop() * state.pop());
+    state.move();
+    goto *labels[state.command()];
+divide:
+    temp = state.pop();
     if (temp == 0) {
-        pop();
+        state.pop();
         std::cout << "What do you want " << temp << "/0 to be? ";
-        scanf("%ld", &temp);
-        push(Value(temp));
+        std::cin >> temp;
+        state.push(temp);
     } else
-        push(Value(pop().value / temp));
-    NEXT()
-}
-modulo : {
-    long_t temp = pop().value;
+        state.push(state.pop() / temp);
+    state.move();
+    goto *labels[state.command()];
+modulo:
+    temp = state.pop();
     if (temp == 0) {
-        pop();
+        state.pop();
         std::cout << "What do you want " << temp << "/0 to be? ";
-        scanf("%ld", &temp);
-        push(Value(temp));
+        std::cin >> temp;
+        state.push(temp);
     } else
-        push(Value(pop().value % temp));
-    NEXT()
-}
+        state.push(state.pop() % temp);
+    state.move();
+    goto *labels[state.command()];
 negate:
-    push(Value(!pop().value));
-    NEXT()
-greater : {
-    long_t temp = pop().value;
-    push(Value(pop().value > temp));
-    NEXT()
-}
+    state.push(!state.pop());
+    state.move();
+    goto *labels[state.command()];
+greater:
+    temp = state.pop();
+    state.push(state.pop() > temp);
+    state.move();
+    goto *labels[state.command()];
+
 right:
-    di = 1;
-    dj = 0;
-    NEXT()
+    state.set_direction(0, 1);
+    state.move();
+    goto *labels[state.command()];
 left:
-    di = -1;
-    dj = 0;
-    NEXT()
+    state.set_direction(0, -1);
+    state.move();
+    goto *labels[state.command()];
 up:
-    di = 0;
-    dj = -1;
-    NEXT()
+    state.set_direction(-1, 0);
+    state.move();
+    goto *labels[state.command()];
 down:
-    di = 0;
-    dj = 1;
-    NEXT()
+    state.set_direction(1, 0);
+    state.move();
+    goto *labels[state.command()];
 random:
-    switch (rand() % 4) {
+    switch (rand() / 32 % 4) {
     case 0:
         goto right;
     case 1:
         goto left;
     case 2:
-        goto down;
-    case 3:
         goto up;
+    case 3:
+        goto down;
     }
 horizontal_if:
-    if (pop().value)
+    if (state.pop())
         goto left;
     goto right;
 vertical_if:
-    if (pop().value)
+    if (state.pop())
         goto up;
     goto down;
+
 stringmode:
     for (;;) {
-        next();
-        print_stack();
-        if (program[j * WIDTH + i] == '"')
+        state.move();
+        if (state.command() == '"')
             break;
-        push(Value(program[j * WIDTH + i]));
+        state.push(state.command());
     }
-    NEXT()
-dup : {
-    Value temp = pop();
-    push(temp);
-    push(temp);
-    NEXT()
-}
-swap : {
-    Value temp1 = pop();
-    Value temp2 = pop();
-    push(temp1);
-    push(temp2);
-    NEXT()
-}
+    state.move();
+    goto *labels[state.command()];
+
+dup:
+    state.dup();
+    state.move();
+    goto *labels[state.command()];
+swap:
+    state.swap();
+    state.move();
+    goto *labels[state.command()];
 pop:
-    pop();
-    NEXT()
+    state.pop();
+    state.move();
+    goto *labels[state.command()];
+
 output_int:
-    std::cout << pop().value << std::flush;
-    NEXT()
+    std::cout << state.pop() << ' ' << std::flush;
+    state.move();
+    goto *labels[state.command()];
 output_char:
-    std::cout << char(pop().value) << std::flush;
-    NEXT()
+    std::cout << char(state.pop()) << std::flush;
+    state.move();
+    goto *labels[state.command()];
+
 bridge:
-    next();
-    NEXT()
-get : {
-    long_t temp1 = pop().value;
-    long_t temp2 = pop().value;
-    if (temp1 < 0 || temp1 >= HEIGHT || temp2 < 0 || temp2 >= WIDTH) {
-        std::cerr << "g 'Get' instruction out of bounds (" << temp2 << "," << temp1 << ")\n";
-        push(Value(0));
-    } else
-        push(Value(program[temp1 * WIDTH + temp2]));
-    NEXT()
-}
-put : {
-    long_t temp1 = pop().value;
-    long_t temp2 = pop().value;
-    if (temp1 < 0 || temp1 >= HEIGHT || temp2 < 0 || temp2 >= WIDTH) {
-        std::cerr << "p 'Put' instruction out of bounds (" << temp2 << "," << temp1 << ")\n";
-        pop();
-    } else {
-        program[temp1 * WIDTH + temp2] = char(pop().value);
-        program_as_labels[temp1 * WIDTH + temp2] = labels[program[temp1 * WIDTH + temp2]];
+    state.move(false);
+    state.move();
+    goto *labels[state.command()];
+
+get:
+    temp1 = state.pop();
+    temp2 = state.pop();
+    try {
+        state.push(state.command(temp1, temp2));
+    } catch (std::out_of_range) {
+        std::cerr << "g 'Get' instruction out of bounds (" << temp2 << "," << temp1 << ")" << std::endl;
+        state.push(0);
     }
-    NEXT()
-}
-input_int : {
-    long_t temp = -1;
-    scanf("%ld", &temp);
-    push(Value(temp));
-    NEXT()
-}
+    state.move();
+    goto *labels[state.command()];
+put:
+    temp1 = state.pop();
+    temp2 = state.pop();
+    try {
+        state.command(temp1, temp2) = char(state.pop());
+    } catch (std::out_of_range) {
+        std::cerr << "p 'Put' instruction out of bounds (" << temp2 << "," << temp1 << ")" << std::endl;
+        state.pop();
+    }
+    state.move();
+    goto *labels[state.command()];
+
+input_int:
+    std::cin >> temp;
+    state.push(temp);
+    state.move();
+    goto *labels[state.command()];
 input_character:
-    push(Value(getchar()));
-    NEXT()
+    state.push(getchar());
+    state.move();
+    goto *labels[state.command()];
+
 end:
     exit(0);
+
 nop:
-    NEXT()
+    state.move();
+    goto *labels[state.command()];
+
 cons : {
-    Value temp = pop();
-    push(allocate(pop(), temp));
-    print_heap();
-    NEXT()
+    state.allocate();
+    // print_heap();
+    state.move();
+    goto *labels[state.command()];
 }
 head:
-    push(head(pop()));
-    NEXT()
+    state.head();
+    state.move();
+    goto *labels[state.command()];
 tail:
-    push(tail(pop()));
-    NEXT()
+    state.tail();
+    state.move();
+    goto *labels[state.command()];
 unsupported:
-    fprintf(stderr, "Unsupported instruction '%c' (0x%02x) (maybe not Befunge-93?)\n", program[j * WIDTH + i], program[j * WIDTH + i]);
-    NEXT()
+    fprintf(stderr, "Unsupported instruction '%c' (0x%02x) (maybe not Befunge-93?)\n", state.command(), state.command());
+    state.move();
+    goto *labels[state.command()];
 }

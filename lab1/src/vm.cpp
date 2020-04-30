@@ -109,8 +109,6 @@ public:
 
 private:
     std::array<std::array<char, WIDTH>, HEIGHT> program;
-    std::vector<long> stack;
-    std::ofstream ofstream;
     struct {
         std::size_t i = 0, j = 0;
     } position;
@@ -118,6 +116,10 @@ private:
         int di = 0, dj = 1;
     } direction;
     int cnt = 0;
+
+    std::vector<long> stack;
+
+    std::ofstream ofstream;
 };
 
 int main(int argc, char *argv[]) {
@@ -133,7 +135,7 @@ int main(int argc, char *argv[]) {
     state.read_program(argv[1]);
     // state.print_program();
 
-    srand(time(NULL));
+    srand(42); // FIXME
 
     labels.fill(&&unsupported);
     for (char c = '0'; c <= '9'; c++)
@@ -233,15 +235,15 @@ down:
     state.move();
     goto *labels[state.command()];
 random:
-    switch (rand() % 4) {
+    switch (rand() / 32 % 4) {
     case 0:
         goto right;
     case 1:
         goto left;
     case 2:
-        goto down;
-    case 3:
         goto up;
+    case 3:
+        goto down;
     }
 horizontal_if:
     if (state.pop())
@@ -334,3 +336,4 @@ unsupported:
     state.move();
     goto *labels[state.command()];
 }
+

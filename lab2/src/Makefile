@@ -5,7 +5,7 @@ CXXFLAGS = -O3 -Wall -Wextra
 all: gc
 
 gc: gc.cpp
-	$(CXX) $(CXXFLAGS) -o gc gc.cpp
+	$(CXX) $(CXXFLAGS) -o $@ $^
 	
 clean:
 	$(RM) gc
