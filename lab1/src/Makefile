@@ -1,11 +1,9 @@
-CXXFLAGS = -O3 -std=gnu++17 -Wall -Wextra -Wno-char-subscripts
-
-.PHONY:	all clean
+CXXFLAGS = -O3 -Wall -Wextra
 
 all: vm
 
 vm: vm.cpp
-	$(CXX) $(CXXFLAGS) -o vm vm.cpp
+	$(CXX) $(CXXFLAGS) -o $@ $<
 
 clean:
 	$(RM) vm
