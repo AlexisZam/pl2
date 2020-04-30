@@ -82,9 +82,10 @@ public:
     }
 
     void dup() {
-        if (stack.empty())
+        if (stack.empty()) {
             stack.push_back(0);
-        else
+            stack.push_back(0);
+        } else
             stack.push_back(stack.back());
     }
 
@@ -103,7 +104,7 @@ public:
         for (const auto e : boost::adaptors::reverse(stack))
             ofstream << e << " ";
         ofstream << std::endl;
-        // cnt++;
+        cnt++;
     }
 
 private:
@@ -116,7 +117,7 @@ private:
     struct {
         int di = 0, dj = 1;
     } direction;
-    // int cnt = 0;
+    int cnt = 0;
 };
 
 int main(int argc, char *argv[]) {
