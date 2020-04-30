@@ -21,10 +21,6 @@ public:
     }
 
     ~State() {
-        while (!stack.empty()) {
-            // print_stack();
-            stack.pop_back();
-        }
         ofstream.close();
     }
 
@@ -54,11 +50,9 @@ public:
         }
     }
 
-    void move(bool print = true) {
+    void move() {
         position.i = (position.i + direction.di + HEIGHT) % HEIGHT;
         position.j = (position.j + direction.dj + WIDTH) % WIDTH;
-        // if (print)
-        //     print_stack();
     }
 
     char command() { // FIXME return reference
@@ -105,33 +99,20 @@ public:
             std::swap(stack.back(), *(stack.end() - 2));
     }
 
-    void print_stack() {
-        for (const auto e : boost::adaptors::reverse(stack)) {
-            if (e.marked)
-                ofstream << "\033[1;31m";
-            ofstream << "\033[1;31m" << e.value << ":" << e.pointer << " \033[0m";
-        }
-        ofstream << std::endl;
-        cnt++;
-    }
-
-    // TODO: stack used as adresses are implicitly cast, and conversely
-    // TODO: should we type check?
-
     void allocate() {
-        try {
-            std::size_t temp = freelist;
-            freelist = heap.at(freelist).head.value;
-            Value tail = pop_value();
-            heap[temp] = ConsCell(pop_value(), tail);
-            stack.push_back(Value(temp, true, false));
-        } catch (std::out_of_range) {
+        if (freelist == heap.size()) {
             gc();
             if (freelist == heap.size()) {
-                std::cerr << "Heap overflow\n";
+                std::cerr << "Heap overflow" << std::endl;
                 exit(1);
             }
         }
+        Value tail = pop_value();
+        Value head = pop_value();
+        std::size_t previous = freelist;
+        stack.push_back(Value(previous, true, false));
+        freelist = heap[freelist].head.value;
+        heap[previous] = ConsCell(head, tail);
     }
 
     void head() {
@@ -141,25 +122,6 @@ public:
     void tail() {
         stack.push_back(heap[pop()].tail);
     }
-
-    // void print_heap() {
-    //     std::size_t temp = freelist;
-    //     dprintf(4, "(((%d))) ", temp);
-    //     for (std::size_t i = 0; i < HEAP_SIZE; i++)
-    //         if (i == temp) {
-    //             dprintf(4, "(((%d))) ", temp);
-    //             temp = heap[temp].head.value;
-    //         } else {
-    //             if (heap[i].head.marked || heap[i].tail.marked)
-    //                 dprintf(4, "\033[1;31m");
-    //             dprintf(4, "(%ld:%d,%ld:%d) ",
-    //                     heap[i].head.value, heap[i].head.pointer, heap[i].tail.value, heap[i].tail.pointer);
-    //             dprintf(4, "\033[0m");
-    //         }
-    //     dprintf(4, "\n");
-    // }
-
-    // TODO: copying
 
 private:
     std::array<std::array<char, WIDTH>, HEIGHT> program;
@@ -212,11 +174,9 @@ private:
     }
 
     void mark() {
-        for (std::size_t i = 0; i < stack.size(); i++)
-            if (stack[i].pointer)
-                DFS(stack[i]);
-        // print_heap();
-        // print_stack();
+        for (auto &e : stack)
+            if (e.pointer)
+                DFS(e);
     }
 
     void sweep() {
@@ -237,7 +197,7 @@ private:
 };
 
 int main(int argc, char *argv[]) {
-    State state;
+    static State state;
     std::array<void *, 128> labels;
     int64_t temp, temp1, temp2;
 
@@ -247,7 +207,6 @@ int main(int argc, char *argv[]) {
     }
 
     state.read_program(argv[1]);
-    // state.print_program();
 
     srand(42); // FIXME
 
@@ -404,7 +363,7 @@ output_char:
     goto *labels[state.command()];
 
 bridge:
-    state.move(false);
+    state.move();
     state.move();
     goto *labels[state.command()];
 
@@ -450,7 +409,6 @@ nop:
 
 cons : {
     state.allocate();
-    // print_heap();
     state.move();
     goto *labels[state.command()];
 }
@@ -462,6 +420,7 @@ tail:
     state.tail();
     state.move();
     goto *labels[state.command()];
+
 unsupported:
     fprintf(stderr, "Unsupported instruction '%c' (0x%02x) (maybe not Befunge-93?)\n", state.command(), state.command());
     state.move();

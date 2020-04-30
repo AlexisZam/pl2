@@ -16,10 +16,6 @@ public:
     }
 
     ~State() {
-        while (!stack.empty()) {
-            print_stack();
-            stack.pop_back();
-        }
         ofstream.close();
     }
 
@@ -336,4 +332,3 @@ unsupported:
     state.move();
     goto *labels[state.command()];
 }
-
