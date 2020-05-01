@@ -15,6 +15,7 @@ for test in $(ls ../eg/*.bf); do
     diff -q *.out
     [ $? -eq 0 ] || exit 1
     diff -q *.err
+    [ $? -eq 0 ] || exit 1
     [ -f "bef.stack" ] && diff -q *.stack
 done
 rm -f *out *err *stack

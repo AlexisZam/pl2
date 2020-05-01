@@ -12,7 +12,7 @@
 #define HEIGHT 25
 #define WIDTH 80
 #define STACK_SIZE (1024 * 1024)
-#define INIT_STACK_SIZE (1024 * 1024)
+#define INIT_STACK_SIZE (16 * 1024 * 1024)
 #define STACK_FD 3
 #define HEAP_SIZE (16 * 1024 * 1024)
 
@@ -40,12 +40,12 @@ void next() {
 }
 
 void init_program() {
-    for (int y = 0; y < HEIGHT; y++)
-        for (int x = 0; x < WIDTH; x++)
-            program[y][x] = ' ';
+    memset(program, ' ', HEIGHT * WIDTH);
 }
 
 void read_program(const char *filename) {
+    // if (!strchr(filename, '.'))
+    //     strcat(filename, ".bf");
     FILE *stream = fopen(filename, "r");
     if (!stream) {
         printf("Error: couldn't open '%s' for input.\n", filename);
@@ -61,9 +61,7 @@ void read_program(const char *filename) {
             cnt--;
         if (cnt > WIDTH)
             cnt = WIDTH;
-        for (int x = 0; x < cnt; x++) {
-            program[y][x] = lineptr[x];
-        }
+        memcpy(program[y], lineptr, cnt);
     }
     fclose(stream);
 }
@@ -119,15 +117,17 @@ void print_stack() {
 }
 
 int main(int argc, char *argv[]) {
-    long l, l1, l2;
-
     if (argc != 2) {
-        printf("Usage: vm foo.bf\n");
+        printf("USAGE: vm foo.bf\n");
         exit(EXIT_FAILURE);
     }
 
     init_program();
     read_program(argv[1]);
+
+    init_stack();
+
+    srand(time(NULL));
 
 #define ASCII 128
     void *labels[] = {[0 ... ASCII - 1] = &&unsupported};
@@ -167,9 +167,7 @@ int main(int argc, char *argv[]) {
             program_as_labels[j * WIDTH + i] = labels[program[j][i]];
     pc = program_as_labels;
 
-    srand(time(NULL));
-
-    init_stack();
+    long l, l1, l2;
 
     goto **pc;
 digit:
@@ -186,24 +184,18 @@ multiply:
     push(pop() * pop());
     NEXT()
 divide:
-    l = pop();
-    if (l == 0) {
-        pop();
-        printf("What do you want %ld/0 to be? ", l);
+    l1 = pop();
+    l2 = pop();
+    if (l1 == 0) {
+        printf("What do you want %ld/0 to be? ", l2);
         scanf("%ld", &l);
         push(l);
     } else
-        push(pop() / l);
+        push(l2 / l1);
     NEXT()
 modulo:
     l = pop();
-    if (l == 0) {
-        pop();
-        printf("What do you want %ld/0 to be? ", l);
-        scanf("%ld", &l);
-        push(l);
-    } else
-        push(pop() % l);
+    push(pop() % l);
     NEXT()
 negate:
     push(!pop());
@@ -229,15 +221,15 @@ up:
     direction.y = -1;
     NEXT()
 random:
-    switch (rand() % 4) {
+    switch ((rand() / 32) % 4) {
     case 0:
         goto right;
     case 1:
         goto left;
     case 2:
-        goto down;
-    case 3:
         goto up;
+    case 3:
+        goto down;
     }
 horizontal_if:
     if (pop())
@@ -285,7 +277,7 @@ get:
     l1 = pop();
     l2 = pop();
     if (l1 < 0 || l1 >= HEIGHT || l2 < 0 || l2 >= WIDTH) {
-        fprintf(stderr, "g 'Get' instruction out of bounds (%ld,%ld)\n", l2, l1);
+        // fprintf(stderr, "g 'Get' instruction out of bounds (%ld,%ld)\n", l2, l1);
         push(0);
     } else
         push(program[l1][l2]);
@@ -294,7 +286,7 @@ put:
     l1 = pop();
     l2 = pop();
     if (l1 < 0 || l1 >= HEIGHT || l2 < 0 || l2 >= WIDTH) {
-        fprintf(stderr, "p 'Put' instruction out of bounds (%ld,%ld)\n", l2, l1);
+        // fprintf(stderr, "p 'Put' instruction out of bounds (%ld,%ld)\n", l2, l1);
         pop();
     } else {
         program[l1][l2] = pop();
@@ -314,6 +306,6 @@ end:
 nop:
     NEXT()
 unsupported:
-    fprintf(stderr, "Unsupported instruction '%c' (0x%02x) (maybe not Befunge-93?)\n", program[position.y][position.x], program[position.y][position.x]);
+    // fprintf(stderr, "Unsupported instruction '%c' (0x%02x) (maybe not Befunge-93?)\n", program[position.y][position.x], program[position.y][position.x]);
     NEXT()
 }
