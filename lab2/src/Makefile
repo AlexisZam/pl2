@@ -1,11 +1,12 @@
-CXXFLAGS = -O3 -Wall -Wextra
+CC = gcc-9
+CFLAGS = -Ofast -Wall -Wextra -Wno-char-subscripts -Wno-unused-result
 
 .PHONY:	all clean
 
 all: gc
 
-gc: gc.cpp
-	$(CXX) $(CXXFLAGS) -o $@ $^
-	
+vm: gc.c
+	$(CC) $(CFLAGS) -o $@ $<
+
 clean:
 	$(RM) gc

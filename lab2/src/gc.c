@@ -5,42 +5,31 @@
 #include <time.h>
 #include <unistd.h>
 
-#define DIRECT_THREADING
-
 #define HEIGHT 25
 #define WIDTH 80
 #define STACK_SIZE (1024 * 1024)
 #define HEAP_SIZE (16 * 1024 * 1024)
 
-#ifdef DIRECT_THREADING
 #define NEXT() \
     next();    \
     goto **pc;
-#else
-#define NEXT() \
-    next();    \
-    goto *labels[program[j * WIDTH + i]];
-#endif /* DIRECT_STHREADING */
 
 /* Program */
 
-int i = 0, j = 0;
-int di = 1, dj = 0;
-#ifdef DIRECT_THREADING
+char program[HEIGHT][WIDTH];
+struct {
+    int x, y;
+} position = {0, 0};
+struct {
+    int x, y;
+} direction = {1, 0};
 void **pc;
-#endif /* DIRECT_THREADING */
-
-char program[] = {[0 ... HEIGHT * WIDTH - 1] = ' '};
 
 void next() {
-#ifdef DIRECT_THREADING
-    int l1 = j, l2 = i;
-#endif /* DIRECT_THREADING */
-    i = (i + di + WIDTH) % WIDTH;
-    j = (j + dj + HEIGHT) % HEIGHT;
-#ifdef DIRECT_THREADING
-    pc += (j - l1) * WIDTH + (i - l2);
-#endif /* DIRECT_THREADING */
+    int x = position.x, y = position.y;
+    position.x = (position.x + direction.x + WIDTH) % WIDTH;
+    position.y = (position.y + direction.y + HEIGHT) % HEIGHT;
+    pc += (position.y - y) * WIDTH + (position.x - x);
 }
 
 void read_program(const char *filename) {
@@ -49,6 +38,10 @@ void read_program(const char *filename) {
         printf("Error: couldn't open '%s' for input.\n", filename);
         exit(EXIT_FAILURE);
     }
+    for (int j = 0; j < HEIGHT; j++)
+        for (int i = 0; i < WIDTH; i++)
+            program[j][i] = ' ';
+    int i = 0, j = 0;
     for (;;) {
         int c = fgetc(stream);
         if (feof(stream))
@@ -59,7 +52,7 @@ void read_program(const char *filename) {
             if (j >= HEIGHT)
                 goto eof;
         } else {
-            program[j * WIDTH + i] = c;
+            program[j][i] = c;
             i++;
             if (i >= WIDTH)
                 for (;;) {
@@ -87,7 +80,6 @@ struct value {
     bool pointer : 1;
     bool marked : 1;
 };
-
 struct value stack[STACK_SIZE];
 int top = 0;
 
@@ -175,7 +167,7 @@ int main(int argc, char *argv[]) {
     struct value v, v1, v2;
 
     if (argc != 2) {
-        fprintf(stderr, "Usage: vm foo.bf\n");
+        printf("Usage: vm foo.bf\n");
         exit(EXIT_FAILURE);
     }
 
@@ -216,15 +208,11 @@ int main(int argc, char *argv[]) {
     labels['h'] = &&head;
     labels['t'] = &&tail;
 
-#ifdef DIRECT_THREADING
     void *program_as_labels[HEIGHT * WIDTH];
     for (int j = 0; j < HEIGHT; j++)
         for (int i = 0; i < WIDTH; i++)
-            program_as_labels[j * WIDTH + i] = labels[program[j * WIDTH + i]];
+            program_as_labels[j * WIDTH + i] = labels[program[j][i]];
     pc = program_as_labels;
-#endif /* DIRECT_THREADING */
-
-    i = j = 0;
 
     srand(time(NULL));
 
@@ -232,7 +220,7 @@ int main(int argc, char *argv[]) {
 
     goto **pc;
 digit:
-    push(program[j * WIDTH + i] - '0');
+    push(program[position.y][position.x] - '0');
     NEXT()
 add:
     push(pop() + pop());
@@ -272,20 +260,20 @@ greater:
     push(pop() > l);
     NEXT()
 right:
-    di = 1;
-    dj = 0;
+    direction.x = 1;
+    direction.y = 0;
     NEXT()
 left:
-    di = -1;
-    dj = 0;
+    direction.x = -1;
+    direction.y = 0;
     NEXT()
 down:
-    di = 0;
-    dj = 1;
+    direction.x = 0;
+    direction.y = 1;
     NEXT()
 up:
-    di = 0;
-    dj = -1;
+    direction.x = 0;
+    direction.y = -1;
     NEXT()
 random:
     switch (rand() % 4) {
@@ -309,9 +297,9 @@ vertical_if:
 stringmode:
     for (;;) {
         next();
-        if (program[j * WIDTH + i] == '"')
+        if (program[position.y][position.x] == '"')
             break;
-        push(program[j * WIDTH + i]);
+        push(program[position.y][position.x]);
     }
     NEXT()
 dup:
@@ -346,7 +334,7 @@ get:
         fprintf(stderr, "g 'Get' instruction out of bounds (%ld,%ld)\n", l2, l1);
         push(0);
     } else
-        push(program[l1 * WIDTH + l2]);
+        push(program[l1][l2]);
     NEXT()
 put:
     l1 = pop();
@@ -355,10 +343,8 @@ put:
         fprintf(stderr, "p 'Put' instruction out of bounds (%ld,%ld)\n", l2, l1);
         pop();
     } else {
-        program[l1 * WIDTH + l2] = pop();
-#ifdef DIRECT_THREADING
-        program_as_labels[l1 * WIDTH + l2] = labels[program[l1 * WIDTH + l2]];
-#endif /* DIRECT_THREADING */
+        program[l1][l2] = pop();
+        program_as_labels[l1 * WIDTH + l2] = labels[program[l1][l2]];
     }
     NEXT()
 input_int:
@@ -393,6 +379,6 @@ tail:
     push_value(heap[pop()].tail);
     NEXT()
 unsupported:
-    fprintf(stderr, "Unsupported instruction '%c' (0x%02x) (maybe not Befunge-93?)\n", program[j * WIDTH + i], program[j * WIDTH + i]);
+    fprintf(stderr, "Unsupported instruction '%c' (0x%02x) (maybe not Befunge-93?)\n", program[position.y][position.x], program[position.y][position.x]);
     NEXT()
 }

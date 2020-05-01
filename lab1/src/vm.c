@@ -5,98 +5,49 @@
 #include <time.h>
 #include <unistd.h>
 
-#define DIRECT_THREADING
 // #define DYNAMIC_STACK
 // #define PRINT_STACK
 
+#define HEIGHT 25
+#define WIDTH 80
 #define STACK_SIZE (1024 * 1024)
-#define INIT_STACK_SIZE 1024
+#define INIT_STACK_SIZE (1024 * 1024)
 #define STACK_FD 3
 #define HEAP_SIZE (16 * 1024 * 1024)
 
-#ifdef DIRECT_THREADING
 #define NEXT()     \
     next();        \
     print_stack(); \
     goto **pc;
-#else
-#define NEXT()     \
-    next();        \
-    print_stack(); \
-    goto *labels[program[j * WIDTH + i]];
-#endif /* DIRECT_STHREADING */
 
-int top = 0;
-#ifdef DYNAMIC_STACK
-int stack_size = 0;
-long *stack = NULL;
-#else
-long stack[STACK_SIZE];
-#endif /* DYNAMIC_STACK */
+/* Program */
 
-void init_stack() {
-#ifdef DYNAMIC_STACK
-    stack_size = INIT_STACK_SIZE;
-    stack = malloc(stack_size * sizeof);
-#endif /* DYNAMIC_STACK */
-}
-
-static inline void push(long value) {
-#ifdef DYNAMIC_STACK
-    if (top == stack_size) {
-        stack_size *= 2;
-        stack = realloc(stack, stack_size * sizeof);
-    }
-#else
-    if (top == STACK_SIZE) {
-        fprintf(stderr, "Stack overflow\n");
-        exit(EXIT_FAILURE);
-    }
-#endif /* DYNAMIC_STACK */
-    stack[top++] = value;
-}
-
-static inline long pop() {
-    if (!top)
-        return 0;
-    return stack[--top];
-}
-
-void print_stack() {
-#ifdef PRINT_STACK
-    for (int i = top - 1; i >= 0; i--)
-        dprintf(STACK_FD, "%ld ", stack[i]);
-    dprintf(STACK_FD, "\n");
-#endif /* PRINT_STACK */
-}
-
-int i = 0, j = 0;
-int di = 1, dj = 0;
-#ifdef DIRECT_THREADING
+char program[HEIGHT][WIDTH];
+struct {
+    int x, y;
+} position = {0, 0};
+struct {
+    int x, y;
+} direction = {1, 0};
 void **pc;
-#endif /* DIRECT_THREADING */
-
-#define HEIGHT 25
-#define WIDTH 80
-char program[] = {[0 ... HEIGHT * WIDTH - 1] = ' '};
 
 void next() {
-#ifdef DIRECT_THREADING
-    int temp1 = j, temp2 = i;
-#endif /* DIRECT_THREADING */
-    i = (i + di + WIDTH) % WIDTH;
-    j = (j + dj + HEIGHT) % HEIGHT;
-#ifdef DIRECT_THREADING
-    pc += (j - temp1) * WIDTH + (i - temp2);
-#endif /* DIRECT_THREADING */
+    int x = position.x, y = position.y;
+    position.x = (position.x + direction.x + WIDTH) % WIDTH;
+    position.y = (position.y + direction.y + HEIGHT) % HEIGHT;
+    pc += (position.y - y) * WIDTH + (position.x - x);
 }
 
 void read_program(const char *filename) {
     FILE *stream = fopen(filename, "r");
     if (!stream) {
-        fprintf(stderr, "Error: couldn't open '%s' for input.\n", filename);
+        printf("Error: couldn't open '%s' for input.\n", filename);
         exit(EXIT_FAILURE);
     }
+    for (int j = 0; j < HEIGHT; j++)
+        for (int i = 0; i < WIDTH; i++)
+            program[j][i] = ' ';
+    int i = 0, j = 0;
     for (;;) {
         int c = fgetc(stream);
         if (feof(stream))
@@ -107,7 +58,7 @@ void read_program(const char *filename) {
             if (j >= HEIGHT)
                 goto eof;
         } else {
-            program[j * WIDTH + i] = c;
+            program[j][i] = c;
             i++;
             if (i >= WIDTH)
                 for (;;) {
@@ -128,11 +79,61 @@ eof:
     fclose(stream);
 }
 
+/* Stack */
+
+#ifdef DYNAMIC_STACK
+int stack_size = 0;
+long *stack = NULL;
+#else
+long stack[STACK_SIZE];
+#endif /* DYNAMIC_STACK */
+int top = 0;
+
+void init_stack() {
+#ifdef DYNAMIC_STACK
+    stack_size = INIT_STACK_SIZE;
+    stack = malloc(stack_size * sizeof(long));
+#endif /* DYNAMIC_STACK */
+}
+
+static inline void push(long l) {
+#ifdef DYNAMIC_STACK
+    if (top == stack_size) {
+        stack_size *= 2;
+        stack = realloc(stack, stack_size * sizeof(long));
+        if (!stack) {
+            fprintf(stderr, "Stack overflow\n");
+            exit(EXIT_FAILURE);
+        }
+    }
+#else
+    if (top == STACK_SIZE) {
+        fprintf(stderr, "Stack overflow\n");
+        exit(EXIT_FAILURE);
+    }
+#endif /* DYNAMIC_STACK */
+    stack[top++] = l;
+}
+
+static inline long pop() {
+    if (!top)
+        return 0;
+    return stack[--top];
+}
+
+void print_stack() {
+#ifdef PRINT_STACK
+    for (int i = top - 1; i >= 0; i--)
+        dprintf(STACK_FD, "%ld ", stack[i]);
+    dprintf(STACK_FD, "\n");
+#endif /* PRINT_STACK */
+}
+
 int main(int argc, char *argv[]) {
-    long temp, temp1, temp2;
+    long l, l1, l2;
 
     if (argc != 2) {
-        fprintf(stderr, "Usage: vm foo.bf\n");
+        printf("Usage: vm foo.bf\n");
         exit(EXIT_FAILURE);
     }
 
@@ -170,15 +171,11 @@ int main(int argc, char *argv[]) {
     labels['@'] = &&end;
     labels[' '] = &&nop;
 
-#ifdef DIRECT_THREADING
     void *program_as_labels[HEIGHT * WIDTH];
     for (int j = 0; j < HEIGHT; j++)
         for (int i = 0; i < WIDTH; i++)
-            program_as_labels[j * WIDTH + i] = labels[program[j * WIDTH + i]];
+            program_as_labels[j * WIDTH + i] = labels[program[j][i]];
     pc = program_as_labels;
-#endif /* DIRECT_THREADING */
-
-    i = j = 0;
 
     srand(time(NULL));
 
@@ -186,60 +183,60 @@ int main(int argc, char *argv[]) {
 
     goto **pc;
 digit:
-    push(program[j * WIDTH + i] - '0');
+    push(program[position.y][position.x] - '0');
     NEXT()
 add:
     push(pop() + pop());
     NEXT()
 subtract:
-    temp = pop();
-    push(pop() - temp);
+    l = pop();
+    push(pop() - l);
     NEXT()
 multiply:
     push(pop() * pop());
     NEXT()
 divide:
-    temp = pop();
-    if (temp == 0) {
+    l = pop();
+    if (l == 0) {
         pop();
-        printf("What do you want %ld/0 to be? ", temp);
-        scanf("%ld", &temp);
-        push(temp);
+        printf("What do you want %ld/0 to be? ", l);
+        scanf("%ld", &l);
+        push(l);
     } else
-        push(pop() / temp);
+        push(pop() / l);
     NEXT()
 modulo:
-    temp = pop();
-    if (temp == 0) {
+    l = pop();
+    if (l == 0) {
         pop();
-        printf("What do you want %ld/0 to be? ", temp);
-        scanf("%ld", &temp);
-        push(temp);
+        printf("What do you want %ld/0 to be? ", l);
+        scanf("%ld", &l);
+        push(l);
     } else
-        push(pop() % temp);
+        push(pop() % l);
     NEXT()
 negate:
     push(!pop());
     NEXT()
 greater:
-    temp = pop();
-    push(pop() > temp);
+    l = pop();
+    push(pop() > l);
     NEXT()
 right:
-    di = 1;
-    dj = 0;
+    direction.x = 1;
+    direction.y = 0;
     NEXT()
 left:
-    di = -1;
-    dj = 0;
+    direction.x = -1;
+    direction.y = 0;
     NEXT()
 down:
-    di = 0;
-    dj = 1;
+    direction.x = 0;
+    direction.y = 1;
     NEXT()
 up:
-    di = 0;
-    dj = -1;
+    direction.x = 0;
+    direction.y = -1;
     NEXT()
 random:
     switch (rand() % 4) {
@@ -264,21 +261,21 @@ stringmode:
     for (;;) {
         next();
         print_stack();
-        if (program[j * WIDTH + i] == '"')
+        if (program[position.y][position.x] == '"')
             break;
-        push(program[j * WIDTH + i]);
+        push(program[position.y][position.x]);
     }
     NEXT()
 dup:
-    temp = pop();
-    push(temp);
-    push(temp);
+    l = pop();
+    push(l);
+    push(l);
     NEXT()
 swap:
-    temp1 = pop();
-    temp2 = pop();
-    push(temp1);
-    push(temp2);
+    l1 = pop();
+    l2 = pop();
+    push(l1);
+    push(l2);
     NEXT()
 pop:
     pop();
@@ -295,31 +292,29 @@ bridge:
     next();
     NEXT()
 get:
-    temp1 = pop();
-    temp2 = pop();
-    if (temp1 < 0 || temp1 >= HEIGHT || temp2 < 0 || temp2 >= WIDTH) {
-        fprintf(stderr, "g 'Get' instruction out of bounds (%ld,%ld)\n", temp2, temp1);
+    l1 = pop();
+    l2 = pop();
+    if (l1 < 0 || l1 >= HEIGHT || l2 < 0 || l2 >= WIDTH) {
+        fprintf(stderr, "g 'Get' instruction out of bounds (%ld,%ld)\n", l2, l1);
         push(0);
     } else
-        push(program[temp1 * WIDTH + temp2]);
+        push(program[l1][l2]);
     NEXT()
 put:
-    temp1 = pop();
-    temp2 = pop();
-    if (temp1 < 0 || temp1 >= HEIGHT || temp2 < 0 || temp2 >= WIDTH) {
-        fprintf(stderr, "p 'Put' instruction out of bounds (%ld,%ld)\n", temp2, temp1);
+    l1 = pop();
+    l2 = pop();
+    if (l1 < 0 || l1 >= HEIGHT || l2 < 0 || l2 >= WIDTH) {
+        fprintf(stderr, "p 'Put' instruction out of bounds (%ld,%ld)\n", l2, l1);
         pop();
     } else {
-        program[temp1 * WIDTH + temp2] = pop();
-#ifdef DIRECT_THREADING
-        program_as_labels[temp1 * WIDTH + temp2] = labels[program[temp1 * WIDTH + temp2]];
-#endif /* DIRECT_THREADING */
+        program[l1][l2] = pop();
+        program_as_labels[l1 * WIDTH + l2] = labels[program[l1][l2]];
     }
     NEXT()
 input_int:
-    temp = -1;
-    scanf("%ld", &temp);
-    push(temp);
+    l = -1;
+    scanf("%ld", &l);
+    push(l);
     NEXT()
 input_char:
     push(getchar());
@@ -329,6 +324,6 @@ end:
 nop:
     NEXT()
 unsupported:
-    fprintf(stderr, "Unsupported instruction '%c' (0x%02x) (maybe not Befunge-93?)\n", program[j * WIDTH + i], program[j * WIDTH + i]);
+    fprintf(stderr, "Unsupported instruction '%c' (0x%02x) (maybe not Befunge-93?)\n", program[position.y][position.x], program[position.y][position.x]);
     NEXT()
 }
