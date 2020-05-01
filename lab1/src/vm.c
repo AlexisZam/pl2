@@ -1,6 +1,7 @@
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <sys/types.h>
 #include <time.h>
 #include <unistd.h>
@@ -38,44 +39,32 @@ void next() {
     pc += (position.y - y) * WIDTH + (position.x - x);
 }
 
+void init_program() {
+    for (int y = 0; y < HEIGHT; y++)
+        for (int x = 0; x < WIDTH; x++)
+            program[y][x] = ' ';
+}
+
 void read_program(const char *filename) {
     FILE *stream = fopen(filename, "r");
     if (!stream) {
         printf("Error: couldn't open '%s' for input.\n", filename);
         exit(EXIT_FAILURE);
     }
-    for (int j = 0; j < HEIGHT; j++)
-        for (int i = 0; i < WIDTH; i++)
-            program[j][i] = ' ';
-    int i = 0, j = 0;
-    for (;;) {
-        int c = fgetc(stream);
-        if (feof(stream))
-            goto eof;
-        if (c == '\n') {
-            i = 0;
-            j++;
-            if (j >= HEIGHT)
-                goto eof;
-        } else {
-            program[j][i] = c;
-            i++;
-            if (i >= WIDTH)
-                for (;;) {
-                    c = fgetc(stream);
-                    if (feof(stream))
-                        goto eof;
-                    if (c == '\n') {
-                        i = 0;
-                        j++;
-                        if (j >= HEIGHT)
-                            goto eof;
-                        break;
-                    }
-                }
+    char *lineptr = NULL;
+    size_t n = 0;
+    for (int y = 0; y < HEIGHT; y++) {
+        ssize_t cnt = getline(&lineptr, &n, stream);
+        if (cnt == -1)
+            break;
+        if (lineptr[cnt - 1] == '\n')
+            cnt--;
+        if (cnt > WIDTH)
+            cnt = WIDTH;
+        for (int x = 0; x < cnt; x++) {
+            program[y][x] = lineptr[x];
         }
     }
-eof:
     fclose(stream);
 }
 
@@ -137,6 +126,7 @@ int main(int argc, char *argv[]) {
         exit(EXIT_FAILURE);
     }
 
+    init_program();
     read_program(argv[1]);
 
 #define ASCII 128
