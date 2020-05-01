@@ -14,7 +14,8 @@ for test in $(ls ../eg/*.bf); do
     sed -i 1d bef.out
     diff -q *.out
     diff -q *.err
-    diff -q *.stack
+    [ $? -eq 0 ] || exit 1
+    [ -f "bef.stack" ] && diff -q *.stack
 done
 rm -f *out *err *stack
 make clean >/dev/null
