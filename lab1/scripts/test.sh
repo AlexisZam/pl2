@@ -13,9 +13,9 @@ for test in $(ls ../eg/*.bf); do
     ./vm ${test} <${input} >vm.out 2>vm.err 3>vm.stack
     sed -i 1d bef.out
     diff -q *.out
+    [ $? -eq 0 ] || exit 1
     diff -q *.err
     [ -f "bef.stack" ] && diff -q *.stack
-    [ $? -eq 0 ] || exit 1
 done
 rm -f *out *err *stack
 make clean >/dev/null
