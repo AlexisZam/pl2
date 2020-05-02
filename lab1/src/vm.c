@@ -4,18 +4,9 @@
 #include <time.h>
 #include <unistd.h>
 
-// FIXME
-#define PRINT_STACK
-
 #define PROGRAM_HEIGHT 25
 #define PROGRAM_WIDTH 80
 #define STACK_SIZE (1024 * 1024)
-
-// FIXME
-#define MOVE()     \
-    move();        \
-    print_stack(); \
-    goto **pc
 
 /* Program */
 
@@ -35,7 +26,7 @@ void init_program() {
 void read_program(const char *pathname) {
     FILE *stream = fopen(pathname, "r");
     if (!stream) {
-        printf("Error: couldn't open '%s' for input.\n", pathname); // FIXME
+        printf("Error: couldn't open '%s' for input.\n", pathname);
         exit(EXIT_FAILURE);
     }
     char *lineptr = NULL;
@@ -76,14 +67,6 @@ long pop() {
     return stack[--top];
 }
 
-void print_stack() { // FIXME
-#ifdef PRINT_STACK
-    for (int i = top - 1; i >= 0; i--)
-        dprintf(3, "%ld ", stack[i]);
-    dprintf(3, "\n");
-#endif /* PRINT_STACK */
-}
-
 int main(int argc, char *argv[]) {
     if (argc != 2) {
         printf("USAGE: vm foo.bf\n");
@@ -93,9 +76,9 @@ int main(int argc, char *argv[]) {
     init_program();
     read_program(argv[1]);
 
-    srand(42); // FIXME
+    srand(time(NULL));
 
-    void *labels[] = {[0 ... 127] = &&unsupported};
+    void *labels[] = {[0 ... 127] = &&nop};
     for (char c = '0'; c <= '9'; c++)
         labels[c] = &&digit;
     labels['+'] = &&add;
@@ -136,50 +119,62 @@ int main(int argc, char *argv[]) {
     goto **pc;
 digit:
     push(program[position.y][position.x] - '0');
-    MOVE();
+    move();
+    goto **pc;
 add:
     push(pop() + pop());
-    MOVE();
+    move();
+    goto **pc;
 subtract:
     l = pop();
     push(pop() - l);
-    MOVE();
+    move();
+    goto **pc;
 multiply:
     push(pop() * pop());
-    MOVE();
+    move();
+    goto **pc;
 divide:
     l = pop();
     push(pop() / l);
-    MOVE();
+    move();
+    goto **pc;
 modulo:
     l = pop();
     push(pop() % l);
-    MOVE();
+    move();
+    goto **pc;
 negate:
     push(!pop());
-    MOVE();
+    move();
+    goto **pc;
 greater:
     l = pop();
     push(pop() > l);
-    MOVE();
+    move();
+    goto **pc;
 right:
     direction.x = 1;
     direction.y = 0;
-    MOVE();
+    move();
+    goto **pc;
 left:
     direction.x = -1;
     direction.y = 0;
-    MOVE();
+    move();
+    goto **pc;
 up:
     direction.x = 0;
     direction.y = -1;
-    MOVE();
+    move();
+    goto **pc;
 down:
     direction.x = 0;
     direction.y = 1;
-    MOVE();
+    move();
+    goto **pc;
 random:
-    switch ((rand() / 32) % 4) { // FIXME
+    switch (rand() % 4) {
     case 0:
         goto right;
     case 1:
@@ -200,70 +195,76 @@ vertical_if:
 stringmode:
     for (;;) {
         move();
-        print_stack(); // FIXME
         if (program[position.y][position.x] == '"')
             break;
         push(program[position.y][position.x]);
     }
-    MOVE();
+    move();
+    goto **pc;
 dup:
     l = pop();
     push(l);
     push(l);
-    MOVE();
+    move();
+    goto **pc;
 swap:
     l1 = pop();
     l2 = pop();
     push(l1);
     push(l2);
-    MOVE();
+    move();
+    goto **pc;
 pop:
     pop();
-    MOVE();
+    move();
+    goto **pc;
 output_int:
     printf("%ld ", pop());
     fflush(stdout);
-    MOVE();
+    move();
+    goto **pc;
 output_char:
     printf("%c", (char)pop());
     fflush(stdout);
-    MOVE();
+    move();
+    goto **pc;
 bridge:
     move();
-    MOVE();
+    move();
+    goto **pc;
 get:
     l1 = pop();
     l2 = pop();
-    if (l1 < 0 || l1 >= PROGRAM_HEIGHT || l2 < 0 || l2 >= PROGRAM_WIDTH) {
-        fprintf(stderr, "g 'Get' instruction out of bounds (%ld,%ld)\n", l2, l1); // FIXME
+    if (l1 < 0 || l1 >= PROGRAM_HEIGHT || l2 < 0 || l2 >= PROGRAM_WIDTH)
         push(0);
-    } else
+    else
         push(program[l1][l2]);
-    MOVE();
+    move();
+    goto **pc;
 put:
     l1 = pop();
     l2 = pop();
-    if (l1 < 0 || l1 >= PROGRAM_HEIGHT || l2 < 0 || l2 >= PROGRAM_WIDTH) {
-        fprintf(stderr, "p 'Put' instruction out of bounds (%ld,%ld)\n", l2, l1); // FIXME
+    if (l1 < 0 || l1 >= PROGRAM_HEIGHT || l2 < 0 || l2 >= PROGRAM_WIDTH)
         pop();
-    } else {
+    else {
         program[l1][l2] = pop();
         program_as_labels[l1][l2] = labels[program[l1][l2]];
     }
-    MOVE();
+    move();
+    goto **pc;
 input_int:
     l = -1;
     scanf("%ld", &l);
     push(l);
-    MOVE();
+    move();
+    goto **pc;
 input_char:
     push(getchar());
-    MOVE();
+    move();
+    goto **pc;
 end:
     exit(EXIT_SUCCESS);
 nop:
-    MOVE();
-unsupported: // FIXME
-    fprintf(stderr, "Unsupported instruction '%c' (0x%02x) (maybe not Befunge-93?)\n", program[position.y][position.x], program[position.y][position.x]);
-    MOVE();
+    move();
+    goto **pc;
 }
