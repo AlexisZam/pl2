@@ -11,8 +11,8 @@
 #define STACK_SIZE (1024 * 1024)
 #define HEAP_SIZE (16 * 1024 * 1024)
 
-#define NEXT() \
-    next();    \
+#define MOVE() \
+    move();    \
     goto **pc;
 
 /* Program */
@@ -26,7 +26,7 @@ struct {
 } direction = {1, 0};
 void **pc;
 
-void next() {
+void move() {
     int x = position.x, y = position.y;
     position.x = (position.x + direction.x + WIDTH) % WIDTH;
     position.y = (position.y + direction.y + HEIGHT) % HEIGHT;
@@ -70,7 +70,7 @@ struct value {
 struct value stack[STACK_SIZE];
 int top = 0;
 
-static inline void push(long l) {
+void push(long l) {
     if (top == STACK_SIZE) {
         fprintf(stderr, "Stack overflow\n");
         exit(EXIT_FAILURE);
@@ -78,13 +78,13 @@ static inline void push(long l) {
     stack[top++] = (struct value){l, false, false};
 }
 
-static inline long pop() {
+long pop() {
     if (!top)
         return 0;
     return stack[--top].value;
 }
 
-static inline void push_value(struct value value) {
+void push_value(struct value value) {
     if (top == STACK_SIZE) {
         fprintf(stderr, "Stack overflow\n");
         exit(EXIT_FAILURE);
@@ -92,7 +92,7 @@ static inline void push_value(struct value value) {
     stack[top++] = value;
 }
 
-static inline struct value pop_value() {
+struct value pop_value() {
     if (!top)
         return (struct value){0};
     return stack[--top];
@@ -166,8 +166,8 @@ int main(int argc, char *argv[]) {
     labels['`'] = &&greater;
     labels['>'] = &&right;
     labels['<'] = &&left;
-    labels['v'] = &&down;
     labels['^'] = &&up;
+    labels['v'] = &&down;
     labels['?'] = &&random;
     labels['_'] = &&horizontal_if;
     labels['|'] = &&vertical_if;
@@ -188,11 +188,11 @@ int main(int argc, char *argv[]) {
     labels['h'] = &&head;
     labels['t'] = &&tail;
 
-    void *program_as_labels[HEIGHT * WIDTH];
+    void *program_as_labels[HEIGHT][WIDTH];
     for (int j = 0; j < HEIGHT; j++)
         for (int i = 0; i < WIDTH; i++)
-            program_as_labels[j * WIDTH + i] = labels[program[j][i]];
-    pc = program_as_labels;
+            program_as_labels[j][i] = labels[program[j][i]];
+    pc = program_as_labels[0];
 
     srand(time(NULL));
 
@@ -201,17 +201,17 @@ int main(int argc, char *argv[]) {
     goto **pc;
 digit:
     push(program[position.y][position.x] - '0');
-    NEXT()
+    MOVE()
 add:
     push(pop() + pop());
-    NEXT()
+    MOVE()
 subtract:
     l = pop();
     push(pop() - l);
-    NEXT()
+    MOVE()
 multiply:
     push(pop() * pop());
-    NEXT()
+    MOVE()
 divide:
     l = pop();
     if (l == 0) {
@@ -221,7 +221,7 @@ divide:
         push(l);
     } else
         push(pop() / l);
-    NEXT()
+    MOVE()
 modulo:
     l = pop();
     if (l == 0) {
@@ -231,30 +231,30 @@ modulo:
         push(l);
     } else
         push(pop() % l);
-    NEXT()
+    MOVE()
 negate:
     push(!pop());
-    NEXT()
+    MOVE()
 greater:
     l = pop();
     push(pop() > l);
-    NEXT()
+    MOVE()
 right:
     direction.x = 1;
     direction.y = 0;
-    NEXT()
+    MOVE()
 left:
     direction.x = -1;
     direction.y = 0;
-    NEXT()
-down:
-    direction.x = 0;
-    direction.y = 1;
-    NEXT()
+    MOVE()
 up:
     direction.x = 0;
     direction.y = -1;
-    NEXT()
+    MOVE()
+down:
+    direction.x = 0;
+    direction.y = 1;
+    MOVE()
 random:
     switch (rand() % 4) {
     case 0:
@@ -276,37 +276,37 @@ vertical_if:
     goto down;
 stringmode:
     for (;;) {
-        next();
+        move();
         if (program[position.y][position.x] == '"')
             break;
         push(program[position.y][position.x]);
     }
-    NEXT()
+    MOVE()
 dup:
     v = pop_value();
     push_value(v);
     push_value(v);
-    NEXT()
+    MOVE()
 swap:
     v1 = pop_value();
     v2 = pop_value();
     push_value(v1);
     push_value(v2);
-    NEXT()
+    MOVE()
 pop:
     pop();
-    NEXT()
+    MOVE()
 output_int:
     printf("%ld ", pop());
     fflush(stdout);
-    NEXT()
+    MOVE()
 output_char:
     printf("%c", (char)pop());
     fflush(stdout);
-    NEXT()
+    MOVE()
 bridge:
-    next();
-    NEXT()
+    move();
+    MOVE()
 get:
     l1 = pop();
     l2 = pop();
@@ -315,7 +315,7 @@ get:
         push(0);
     } else
         push(program[l1][l2]);
-    NEXT()
+    MOVE()
 put:
     l1 = pop();
     l2 = pop();
@@ -324,21 +324,21 @@ put:
         pop();
     } else {
         program[l1][l2] = pop();
-        program_as_labels[l1 * WIDTH + l2] = labels[program[l1][l2]];
+        program_as_labels[l1][l2] = labels[program[l1][l2]];
     }
-    NEXT()
+    MOVE()
 input_int:
     l = -1;
     scanf("%ld", &l);
     push(l);
-    NEXT()
+    MOVE()
 input_char:
     push(getchar());
-    NEXT()
+    MOVE()
 end:
     exit(EXIT_SUCCESS);
 nop:
-    NEXT()
+    MOVE()
 cons:
     if (freelist == HEAP_SIZE) {
         gc();
@@ -351,14 +351,14 @@ cons:
     heap[freelist] = (struct cons_cell){pop_value(), v};
     push_value((struct value){freelist, true, false});
     freelist = heap[freelist].head.value;
-    NEXT()
+    MOVE()
 head:
     push_value(heap[pop()].head);
-    NEXT()
+    MOVE()
 tail:
     push_value(heap[pop()].tail);
-    NEXT()
+    MOVE()
 unsupported:
     fprintf(stderr, "Unsupported instruction '%c' (0x%02x) (maybe not Befunge-93?)\n", program[position.y][position.x], program[position.y][position.x]);
-    NEXT()
+    MOVE()
 }
